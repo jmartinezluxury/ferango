@@ -463,62 +463,14 @@
   </div>
 </header>
 
-<!-- ── App screenshot mock ───────────────────────────────────── -->
+<!-- ── Screenshots ────────────────────────────────────────────── -->
 <div class="screenshot-wrap">
-  <div class="screenshot-frame">
-    <div class="screenshot-bar">
-      <span class="dot-red"></span>
-      <span class="dot-yellow"></span>
-      <span class="dot-green"></span>
+  <div style="display:flex;flex-direction:column;gap:1.5rem;">
+    <div class="screenshot-frame" style="overflow:hidden;border-radius:12px;">
+      <img src="screenshots/screen1.png" alt="Ferango dark mode — query editor with results" style="width:100%;display:block;" />
     </div>
-    <div class="screenshot-body">
-      <div class="mock-sidebar">
-        <div class="conn">&#9679; production</div>
-        <div class="db">&#9660; myapp</div>
-        <div class="col">analytics</div>
-        <div class="col active">users</div>
-        <div class="col">orders</div>
-        <div class="db">&#9660; logs</div>
-        <div class="col">events</div>
-      </div>
-      <div class="mock-main">
-        <div class="mock-editor">
-          <div><span class="cmt">// Find active users in the last 7 days</span></div>
-          <div>
-            <span class="fn">db</span>.<span class="fn">getCollection</span>(<span class="str">"users"</span>)
-          </div>
-          <div style="padding-left:1.2rem">
-            .<span class="fn">find</span>({
-          </div>
-          <div style="padding-left:2.4rem">
-            status: <span class="str">"active"</span>,
-          </div>
-          <div style="padding-left:2.4rem">
-            lastSeen: { <span class="kw">$gte</span>: <span class="fn">ISODate</span>(<span class="str">"2024-01-01"</span>) }
-          </div>
-          <div style="padding-left:1.2rem">})</div>
-          <div style="padding-left:1.2rem">.<span class="fn">sort</span>({ createdAt: <span class="num">-1</span> })</div>
-          <div style="padding-left:1.2rem">.<span class="fn">limit</span>(<span class="num">50</span>)</div>
-        </div>
-        <div class="mock-results">
-          <div style="color:var(--muted);margin-bottom:.5rem;font-size:.72rem">3 documents &nbsp;·&nbsp; 2ms</div>
-          <div class="result-row">
-            <span class="col-id">ObjectId("64a...")</span>
-            <span>alice@example.com</span>
-            <span style="color:var(--green)">active</span>
-          </div>
-          <div class="result-row">
-            <span class="col-id">ObjectId("64b...")</span>
-            <span>bob@example.com</span>
-            <span style="color:var(--green)">active</span>
-          </div>
-          <div class="result-row">
-            <span class="col-id">ObjectId("64c...")</span>
-            <span>carol@example.com</span>
-            <span style="color:var(--green)">active</span>
-          </div>
-        </div>
-      </div>
+    <div class="screenshot-frame" style="overflow:hidden;border-radius:12px;">
+      <img src="screenshots/screen2.png" alt="Ferango light mode — query editor with results" style="width:100%;display:block;" />
     </div>
   </div>
 </div>
