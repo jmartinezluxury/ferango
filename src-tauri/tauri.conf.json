@@ -44,10 +44,7 @@
       "icons/icon.ico"
     ],
     "macOS": {
-      "infoPlist": {
-        "CFBundleDisplayName": "Ferango",
-        "CFBundleName": "Ferango"
-      }
+      "infoPlist": "Info.plist"
     }
   }
 }
