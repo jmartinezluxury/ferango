@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-11 -1.5 142 140" width="512" height="512">
+  <defs>
+    <linearGradient id="fg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#ffffff"/>
+      <stop offset="55%"  stop-color="#f7941d"/>
+      <stop offset="100%" stop-color="#e05a00"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <polygon points="60,0 120,34 120,103 60,137 0,103 0,34"
+           fill="#161b22" stroke="#f7941d" stroke-width="1.5"/>
+
+  <text x="60" y="82" text-anchor="middle" dominant-baseline="middle"
+        font-family="'Inter', 'Helvetica Neue', sans-serif"
+        font-size="88" font-weight="800"
+        fill="url(#fg)" filter="url(#glow)" letter-spacing="-2">
+    F
+  </text>
+</svg>

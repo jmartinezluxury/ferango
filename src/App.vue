@@ -58,7 +58,7 @@ onMounted(async () => {
 <template>
   <div class="app-layout">
     <div class="toolbar">
-      <span class="app-brand">dbmongoR</span>
+      <span class="app-brand"><span class="brand-fer">Fer</span><span class="brand-ango">ango</span></span>
       <div class="toolbar-sep" />
       <span class="breadcrumb">
         <span v-if="connStore.activeConn" class="bc-item">{{ connStore.activeConn.name }}</span>
@@ -180,7 +180,14 @@ onMounted(async () => {
   -webkit-app-region: drag; user-select: none;
 }
 .toolbar * { -webkit-app-region: no-drag; }
-.app-brand { font-size: 13px; font-weight: 700; color: var(--accent); }
+.app-brand {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  filter: drop-shadow(0 0 6px rgba(247,148,29,0.4));
+}
+.brand-fer  { color: #ffffff; }
+.brand-ango { color: #f7941d; }
 .toolbar-sep { width: 1px; height: 16px; background: var(--border); }
 .breadcrumb { display: flex; align-items: center; gap: 5px; font-size: 12px; }
 .bc-item  { color: var(--text-dim); }
