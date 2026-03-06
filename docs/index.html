@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ferango — MongoDB GUI for Developers</title>
+  <meta name="description" content="A lightweight, open-source MongoDB GUI client built with Tauri 2 and Rust. Fast, cross-platform, and pleasant to use." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d1117;
+      --bg2:       #161b22;
+      --bg3:       #1c2128;
+      --border:    #30363d;
+      --text:      #e6edf3;
+      --muted:     #8b949e;
+      --accent:    #f7941d;
+      --accent2:   #e05a00;
+      --green:      #3fb950;
+      --radius:    10px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    a { color: inherit; text-decoration: none; }
+
+    /* ── Nav ───────────────────────────────────────────────── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(13,17,23,.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 2rem;
+      height: 60px;
+    }
+
+    .nav-logo {
+      font-weight: 700;
+      font-size: 1.1rem;
+      letter-spacing: -.02em;
+    }
+
+    .nav-logo span { color: var(--accent); }
+
+    .nav-links {
+      display: flex;
+      gap: 1.5rem;
+      align-items: center;
+      font-size: .9rem;
+      color: var(--muted);
+    }
+
+    .nav-links a:hover { color: var(--text); }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: .45rem;
+      padding: .55rem 1.25rem;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: .9rem;
+      transition: opacity .15s, transform .1s;
+      cursor: pointer;
+      border: none;
+    }
+
+    .btn:hover { opacity: .88; transform: translateY(-1px); }
+    .btn:active { transform: translateY(0); }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #000;
+    }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-outline:hover { border-color: var(--muted); }
+
+    /* ── Hero ───────────────────────────────────────────────── */
+    .hero {
+      text-align: center;
+      padding: 6rem 1.5rem 4rem;
+      max-width: 860px;
+      margin: 0 auto;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      padding: .3rem .9rem;
+      font-size: .8rem;
+      color: var(--muted);
+      margin-bottom: 1.5rem;
+    }
+
+    .hero-badge .dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--green);
+      flex-shrink: 0;
+    }
+
+    .hero h1 {
+      font-size: clamp(2.4rem, 6vw, 3.8rem);
+      font-weight: 800;
+      letter-spacing: -.04em;
+      line-height: 1.1;
+      margin-bottom: 1.25rem;
+    }
+
+    .hero h1 span { color: var(--accent); }
+
+    .hero p {
+      font-size: 1.15rem;
+      color: var(--muted);
+      max-width: 600px;
+      margin: 0 auto 2.5rem;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    /* ── Screenshot ─────────────────────────────────────────── */
+    .screenshot-wrap {
+      max-width: 980px;
+      margin: 0 auto 5rem;
+      padding: 0 1.5rem;
+    }
+
+    .screenshot-frame {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 24px 80px rgba(0,0,0,.6);
+    }
+
+    .screenshot-bar {
+      background: var(--bg3);
+      border-bottom: 1px solid var(--border);
+      padding: .6rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+    }
+
+    .dot-red   { width:12px;height:12px;border-radius:50%;background:#ff5f56; }
+    .dot-yellow{ width:12px;height:12px;border-radius:50%;background:#ffbd2e; }
+    .dot-green { width:12px;height:12px;border-radius:50%;background:#27c93f; }
+
+    .screenshot-body {
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      min-height: 380px;
+    }
+
+    .mock-sidebar {
+      border-right: 1px solid var(--border);
+      padding: 1rem .75rem;
+      font-size: .78rem;
+      color: var(--muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .mock-sidebar .conn {
+      color: var(--text);
+      font-weight: 600;
+      margin-bottom: .4rem;
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+    }
+
+    .mock-sidebar .db {
+      padding-left: .9rem;
+      margin-bottom: .25rem;
+    }
+
+    .mock-sidebar .col {
+      padding-left: 1.7rem;
+      margin-bottom: .2rem;
+      color: #7d8590;
+    }
+
+    .mock-sidebar .col.active { color: var(--accent); }
+
+    .mock-main {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .mock-editor {
+      flex: 1;
+      padding: 1.25rem 1.5rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .82rem;
+      line-height: 1.7;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .mock-editor .kw  { color: #ff7b72; }
+    .mock-editor .fn  { color: #d2a8ff; }
+    .mock-editor .str { color: #a5d6ff; }
+    .mock-editor .num { color: #79c0ff; }
+    .mock-editor .cmt { color: #8b949e; }
+
+    .mock-results {
+      padding: 1rem 1.5rem;
+      font-size: .78rem;
+      color: var(--muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .mock-results .result-row {
+      display: flex;
+      gap: 2rem;
+      padding: .3rem 0;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .mock-results .result-row:last-child { border-bottom: none; }
+
+    .mock-results .col-id { color: #79c0ff; }
+
+    /* ── Features ───────────────────────────────────────────── */
+    section { padding: 5rem 1.5rem; }
+
+    .section-label {
+      text-align: center;
+      font-size: .8rem;
+      font-weight: 600;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: .75rem;
+    }
+
+    .section-title {
+      text-align: center;
+      font-size: clamp(1.6rem, 4vw, 2.4rem);
+      font-weight: 700;
+      letter-spacing: -.03em;
+      margin-bottom: .75rem;
+    }
+
+    .section-sub {
+      text-align: center;
+      color: var(--muted);
+      max-width: 540px;
+      margin: 0 auto 3.5rem;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1.25rem;
+      max-width: 1060px;
+      margin: 0 auto;
+    }
+
+    .feature-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      transition: border-color .2s;
+    }
+
+    .feature-card:hover { border-color: var(--accent); }
+
+    .feature-icon {
+      font-size: 1.6rem;
+      margin-bottom: .9rem;
+    }
+
+    .feature-card h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: .4rem;
+    }
+
+    .feature-card p {
+      font-size: .88rem;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    /* ── Ops ───────────────────────────────────────────────── */
+    .ops-section { background: var(--bg2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+
+    .ops-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .6rem;
+      justify-content: center;
+      max-width: 720px;
+      margin: 0 auto;
+    }
+
+    .op-badge {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: .35rem .75rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .82rem;
+      color: #a5d6ff;
+    }
+
+    /* ── Download ──────────────────────────────────────────── */
+    .download-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 1.25rem;
+      max-width: 860px;
+      margin: 0 auto 2.5rem;
+    }
+
+    .dl-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      text-align: center;
+      transition: border-color .2s;
+    }
+
+    .dl-card:hover { border-color: var(--accent); }
+
+    .dl-icon { font-size: 2rem; margin-bottom: .6rem; }
+
+    .dl-card h3 { font-size: 1rem; font-weight: 600; margin-bottom: .3rem; }
+
+    .dl-card p { font-size: .82rem; color: var(--muted); margin-bottom: 1rem; }
+
+    /* ── Stack ─────────────────────────────────────────────── */
+    .stack-grid {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 1rem;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    .stack-pill {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      padding: .45rem 1.1rem;
+      font-size: .85rem;
+      font-weight: 500;
+      color: var(--muted);
+    }
+
+    .stack-pill b { color: var(--text); }
+
+    /* ── Coffee ─────────────────────────────────────────────── */
+    .coffee-section {
+      text-align: center;
+      background: var(--bg2);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 4rem 1.5rem;
+    }
+
+    .coffee-section h2 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: -.03em;
+      margin-bottom: .6rem;
+    }
+
+    .coffee-section p { color: var(--muted); margin-bottom: 1.75rem; }
+
+    /* ── Footer ─────────────────────────────────────────────── */
+    footer {
+      text-align: center;
+      padding: 2.5rem 1.5rem;
+      font-size: .82rem;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+    }
+
+    footer a { color: var(--muted); }
+    footer a:hover { color: var(--text); }
+
+    /* ── Responsive ─────────────────────────────────────────── */
+    @media (max-width: 640px) {
+      .nav-links .hide-sm { display: none; }
+      .screenshot-body { grid-template-columns: 1fr; }
+      .mock-sidebar { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Nav ──────────────────────────────────────────────────── -->
+<nav>
+  <div class="nav-logo" style="display:flex;align-items:center;gap:.5rem;">
+    <img src="ferango.svg" alt="" style="height:32px;width:auto;" />
+    Fer<span>ango</span>
+  </div>
+  <div class="nav-links">
+    <a href="#features" class="hide-sm">Features</a>
+    <a href="#download" class="hide-sm">Download</a>
+    <a href="https://github.com/jmartinezluxury/ferango" target="_blank" rel="noopener" class="hide-sm">GitHub</a>
+    <a href="#download" class="btn btn-primary">Download free</a>
+  </div>
+</nav>
+
+<!-- ── Hero ─────────────────────────────────────────────────── -->
+<header class="hero">
+  <img src="ferango.svg" alt="Ferango logo" style="width:420px;max-width:90%;margin-bottom:2rem;border-radius:14px;" />
+  <div class="hero-badge">
+    <span class="dot"></span>
+    Open source · MIT license
+  </div>
+  <h1>MongoDB GUI<br>built for <span>developers</span></h1>
+  <p>
+    A fast, lightweight desktop client for MongoDB. Write queries in mongosh syntax,
+    browse your data, and manage collections — without the bloat.
+  </p>
+  <div class="hero-actions">
+    <a href="#download" class="btn btn-primary">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z"/><path d="M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.97a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.779a.749.749 0 1 1 1.06-1.06z"/></svg>
+      Download for free
+    </a>
+    <a href="https://github.com/jmartinezluxury/ferango" target="_blank" rel="noopener" class="btn btn-outline">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"/></svg>
+      View on GitHub
+    </a>
+  </div>
+</header>
+
+<!-- ── App screenshot mock ───────────────────────────────────── -->
+<div class="screenshot-wrap">
+  <div class="screenshot-frame">
+    <div class="screenshot-bar">
+      <span class="dot-red"></span>
+      <span class="dot-yellow"></span>
+      <span class="dot-green"></span>
+    </div>
+    <div class="screenshot-body">
+      <div class="mock-sidebar">
+        <div class="conn">&#9679; production</div>
+        <div class="db">&#9660; myapp</div>
+        <div class="col">analytics</div>
+        <div class="col active">users</div>
+        <div class="col">orders</div>
+        <div class="db">&#9660; logs</div>
+        <div class="col">events</div>
+      </div>
+      <div class="mock-main">
+        <div class="mock-editor">
+          <div><span class="cmt">// Find active users in the last 7 days</span></div>
+          <div>
+            <span class="fn">db</span>.<span class="fn">getCollection</span>(<span class="str">"users"</span>)
+          </div>
+          <div style="padding-left:1.2rem">
+            .<span class="fn">find</span>({
+          </div>
+          <div style="padding-left:2.4rem">
+            status: <span class="str">"active"</span>,
+          </div>
+          <div style="padding-left:2.4rem">
+            lastSeen: { <span class="kw">$gte</span>: <span class="fn">ISODate</span>(<span class="str">"2024-01-01"</span>) }
+          </div>
+          <div style="padding-left:1.2rem">})</div>
+          <div style="padding-left:1.2rem">.<span class="fn">sort</span>({ createdAt: <span class="num">-1</span> })</div>
+          <div style="padding-left:1.2rem">.<span class="fn">limit</span>(<span class="num">50</span>)</div>
+        </div>
+        <div class="mock-results">
+          <div style="color:var(--muted);margin-bottom:.5rem;font-size:.72rem">3 documents &nbsp;·&nbsp; 2ms</div>
+          <div class="result-row">
+            <span class="col-id">ObjectId("64a...")</span>
+            <span>alice@example.com</span>
+            <span style="color:var(--green)">active</span>
+          </div>
+          <div class="result-row">
+            <span class="col-id">ObjectId("64b...")</span>
+            <span>bob@example.com</span>
+            <span style="color:var(--green)">active</span>
+          </div>
+          <div class="result-row">
+            <span class="col-id">ObjectId("64c...")</span>
+            <span>carol@example.com</span>
+            <span style="color:var(--green)">active</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Features ──────────────────────────────────────────────── -->
+<section id="features">
+  <div class="section-label">Features</div>
+  <h2 class="section-title">Everything you need, nothing you don't</h2>
+  <p class="section-sub">Built for developers who want speed and simplicity over a feature maze.</p>
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon">&#9998;</div>
+      <h3>Monaco Editor</h3>
+      <p>VS Code's engine with JavaScript syntax highlighting, IntelliSense, and field autocomplete from your collections.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">&#9654;</div>
+      <h3>Run at cursor</h3>
+      <p>Cmd+Enter executes the statement under your cursor. Select text and run only that. Or run everything with one click.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">&#9646;&#9646;&#9646;</div>
+      <h3>Table / JSON / Tree views</h3>
+      <p>Switch between result formats without re-running the query. Click any cell to copy its value to clipboard.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">&#128274;</div>
+      <h3>OS keychain storage</h3>
+      <p>Passwords are stored in macOS Keychain, Windows DPAPI, or libsecret — never in plaintext files.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">&#128196;</div>
+      <h3>Multi-tab scripts</h3>
+      <p>Open multiple scripts at once. Auto-saved on tab switch. Organized per connection in <code>~/.ferango/scripts/</code>.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">&#128295;</div>
+      <h3>Collection tools</h3>
+      <p>Right-click any collection: insert document, view stats, infer schema, list indexes, create or drop.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">&#128200;</div>
+      <h3>Schema inference</h3>
+      <p>Sample N documents to detect field types and presence percentage — without ever writing a MapReduce.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">&#128190;</div>
+      <h3>Export results</h3>
+      <p>Download query results as CSV or JSON with a single click from any view.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">&#9728;</div>
+      <h3>Dark &amp; light theme</h3>
+      <p>Toggle from the toolbar. Font size adjustable from 10 to 24px. Your eyes, your call.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Supported operations ──────────────────────────────────── -->
+<section class="ops-section">
+  <div class="section-label">Supported operations</div>
+  <h2 class="section-title">Full mongosh syntax</h2>
+  <p class="section-sub" style="margin-bottom:2rem">Write queries exactly as you would in mongosh — BSON types and all.</p>
+  <div class="ops-grid">
+    <span class="op-badge">find()</span>
+    <span class="op-badge">findOne()</span>
+    <span class="op-badge">aggregate()</span>
+    <span class="op-badge">countDocuments()</span>
+    <span class="op-badge">insertOne()</span>
+    <span class="op-badge">insertMany()</span>
+    <span class="op-badge">updateOne()</span>
+    <span class="op-badge">updateMany()</span>
+    <span class="op-badge">deleteOne()</span>
+    <span class="op-badge">deleteMany()</span>
+    <span class="op-badge">ObjectId("...")</span>
+    <span class="op-badge">ISODate("...")</span>
+    <span class="op-badge">NumberInt(n)</span>
+    <span class="op-badge">NumberLong(n)</span>
+    <span class="op-badge">NumberDecimal("n")</span>
+    <span class="op-badge">/regex/flags</span>
+    <span class="op-badge">.sort()</span>
+    <span class="op-badge">.limit()</span>
+    <span class="op-badge">.skip()</span>
+  </div>
+</section>
+
+<!-- ── Download ──────────────────────────────────────────────── -->
+<section id="download">
+  <div class="section-label">Download</div>
+  <h2 class="section-title">Free for every platform</h2>
+  <p class="section-sub">Pre-built binaries available on GitHub Releases. No account required.</p>
+  <div class="download-grid">
+    <div class="dl-card">
+      <div class="dl-icon">&#63743;</div>
+      <h3>macOS</h3>
+      <p>Universal binary — Apple Silicon + Intel</p>
+      <a href="https://github.com/jmartinezluxury/ferango/releases/latest" target="_blank" rel="noopener" class="btn btn-primary" style="width:100%;justify-content:center">
+        Download .dmg
+      </a>
+    </div>
+    <div class="dl-card">
+      <div class="dl-icon">&#129695;</div>
+      <h3>Windows</h3>
+      <p>x86_64 — .msi or NSIS installer</p>
+      <a href="https://github.com/jmartinezluxury/ferango/releases/latest" target="_blank" rel="noopener" class="btn btn-primary" style="width:100%;justify-content:center">
+        Download .msi
+      </a>
+    </div>
+    <div class="dl-card">
+      <div class="dl-icon">&#128039;</div>
+      <h3>Linux</h3>
+      <p>x86_64 — .AppImage or .deb</p>
+      <a href="https://github.com/jmartinezluxury/ferango/releases/latest" target="_blank" rel="noopener" class="btn btn-primary" style="width:100%;justify-content:center">
+        Download .AppImage
+      </a>
+    </div>
+  </div>
+  <p style="text-align:center;font-size:.82rem;color:var(--muted)">
+    All releases are on
+    <a href="https://github.com/jmartinezluxury/ferango/releases" target="_blank" rel="noopener" style="color:var(--text);text-decoration:underline">GitHub Releases</a>.
+    macOS note: if Gatekeeper blocks the app, run <code style="font-family:'JetBrains Mono',monospace;font-size:.8rem;color:#a5d6ff">xattr -cr /Applications/Ferango.app</code>.
+  </p>
+</section>
+
+<!-- ── Tech stack ────────────────────────────────────────────── -->
+<section style="padding:4rem 1.5rem;background:var(--bg2);border-top:1px solid var(--border);border-bottom:1px solid var(--border)">
+  <div class="section-label">Tech stack</div>
+  <h2 class="section-title">Built on solid foundations</h2>
+  <p class="section-sub" style="margin-bottom:2rem">Native performance with a modern web frontend.</p>
+  <div class="stack-grid">
+    <div class="stack-pill"><b>Tauri 2</b> &mdash; Rust backend</div>
+    <div class="stack-pill"><b>Vue 3</b> &mdash; frontend</div>
+    <div class="stack-pill"><b>TypeScript</b> &mdash; type safety</div>
+    <div class="stack-pill"><b>Monaco Editor</b> &mdash; query editing</div>
+    <div class="stack-pill"><b>Pinia</b> &mdash; state management</div>
+    <div class="stack-pill"><b>mongodb (Rust)</b> &mdash; official driver</div>
+    <div class="stack-pill"><b>keyring</b> &mdash; OS credential store</div>
+  </div>
+</section>
+
+<!-- ── Buy Me a Coffee ───────────────────────────────────────── -->
+<section class="coffee-section">
+  <h2>Like the project?</h2>
+  <p>Ferango is free and open source. If it saves you time, consider buying me a coffee.</p>
+  <a href="https://www.buymeacoffee.com/jmartinezgx" target="_blank" rel="noopener">
+    <img
+      src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png"
+      alt="Buy Me A Coffee"
+      style="height:50px;border-radius:8px"
+    />
+  </a>
+</section>
+
+<!-- ── Footer ────────────────────────────────────────────────── -->
+<footer>
+  <p>
+    Ferango &mdash; MIT License &mdash;
+    <a href="https://github.com/jmartinezluxury/ferango" target="_blank" rel="noopener">GitHub</a>
+  </p>
+</footer>
+
+</body>
+</html>
