@@ -1,0 +1,184 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 340" width="600" height="340">
+  <defs>
+    <!-- Background gradient -->
+    <radialGradient id="bgGrad" cx="50%" cy="50%" r="70%">
+      <stop offset="0%"  stop-color="#161b22"/>
+      <stop offset="100%" stop-color="#0d1117"/>
+    </radialGradient>
+
+    <!-- Orange glow gradient -->
+    <radialGradient id="glowGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"  stop-color="#f7941d" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#f7941d" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Text gradient -->
+    <linearGradient id="textGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%"   stop-color="#ffffff"/>
+      <stop offset="55%"  stop-color="#f7941d"/>
+      <stop offset="100%" stop-color="#e05a00"/>
+    </linearGradient>
+
+    <!-- Hex clip -->
+    <clipPath id="hexClip">
+      <polygon points="60,0 120,34 120,103 60,137 0,103 0,34"/>
+    </clipPath>
+
+    <!-- Glow filter -->
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Soft glow for dots -->
+    <filter id="dotGlow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Shimmer for text -->
+    <filter id="textGlow" x="-10%" y="-30%" width="120%" height="160%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- ── Background ───────────────────────────────────── -->
+  <rect width="600" height="340" fill="url(#bgGrad)" rx="18"/>
+
+  <!-- ── Ambient glow behind logo mark ───────────────── -->
+  <ellipse cx="170" cy="170" rx="110" ry="110" fill="url(#glowGrad)">
+    <animate attributeName="rx" values="110;130;110" dur="4s" repeatCount="indefinite"/>
+    <animate attributeName="ry" values="110;130;110" dur="4s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="1;0.6;1" dur="4s" repeatCount="indefinite"/>
+  </ellipse>
+
+  <!-- ── Outer orbit ring ─────────────────────────────── -->
+  <g transform="translate(170,170)">
+    <circle r="108" fill="none" stroke="#f7941d" stroke-width="0.6" stroke-dasharray="4 8" opacity="0.3">
+      <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="30s" repeatCount="indefinite"/>
+    </circle>
+
+    <!-- ── Orbiting data dots ─────────────────────────── -->
+    <g filter="url(#dotGlow)">
+      <!-- dot 1 -->
+      <circle r="5" fill="#f7941d" opacity="0.95">
+        <animateMotion dur="8s" repeatCount="indefinite">
+          <mpath href="#orbitPath"/>
+        </animateMotion>
+      </circle>
+      <!-- dot 2 — offset 1/3 -->
+      <circle r="3.5" fill="#ffffff" opacity="0.6">
+        <animateMotion dur="8s" begin="-2.67s" repeatCount="indefinite">
+          <mpath href="#orbitPath"/>
+        </animateMotion>
+      </circle>
+      <!-- dot 3 — offset 2/3 -->
+      <circle r="4" fill="#f7941d" opacity="0.5">
+        <animateMotion dur="8s" begin="-5.33s" repeatCount="indefinite">
+          <mpath href="#orbitPath"/>
+        </animateMotion>
+      </circle>
+    </g>
+  </g>
+
+  <!-- Orbit path definition (centered at 170,170) -->
+  <path id="orbitPath" d="M 278,170 A 108,108 0 1 1 277.99,169" fill="none" opacity="0"/>
+
+  <!-- ── Inner ring ────────────────────────────────────── -->
+  <circle cx="170" cy="170" r="78" fill="none" stroke="#30363d" stroke-width="1" opacity="0.6"/>
+
+  <!-- ── Hexagon face ──────────────────────────────────── -->
+  <g transform="translate(110, 101.5)">
+    <!-- hex background -->
+    <polygon points="60,0 120,34 120,103 60,137 0,103 0,34"
+             fill="#161b22" stroke="#f7941d" stroke-width="1.5" opacity="0.9">
+      <animate attributeName="stroke-opacity" values="0.9;0.4;0.9" dur="3s" repeatCount="indefinite"/>
+    </polygon>
+
+    <!-- F lettermark -->
+    <text x="60" y="82" text-anchor="middle"
+          dominant-baseline="middle"
+          font-family="'Inter', 'Helvetica Neue', sans-serif"
+          font-size="110" font-weight="800" fill="url(#textGrad)"
+          filter="url(#glow)" letter-spacing="-2">
+      F
+    </text>
+  </g>
+
+  <!-- ── Connector lines (data flow aesthetic) ────────── -->
+  <g opacity="0.18" stroke="#f7941d" stroke-width="0.8">
+    <line x1="278" y1="170" x2="340" y2="140">
+      <animate attributeName="opacity" values="0.18;0.5;0.18" dur="2.5s" repeatCount="indefinite"/>
+    </line>
+    <line x1="278" y1="170" x2="340" y2="200">
+      <animate attributeName="opacity" values="0.18;0.5;0.18" dur="2.5s" begin="-0.8s" repeatCount="indefinite"/>
+    </line>
+    <line x1="62"  y1="170" x2="0"   y2="140" opacity="0.1"/>
+    <line x1="62"  y1="170" x2="0"   y2="200" opacity="0.1"/>
+  </g>
+
+  <!-- ── Small terminal nodes ─────────────────────────── -->
+  <circle cx="340" cy="140" r="3" fill="#f7941d" opacity="0.5">
+    <animate attributeName="opacity" values="0.5;1;0.5" dur="2.5s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="340" cy="200" r="3" fill="#f7941d" opacity="0.3">
+    <animate attributeName="opacity" values="0.3;0.9;0.3" dur="2.5s" begin="-0.8s" repeatCount="indefinite"/>
+  </circle>
+
+  <!-- ── Wordmark ──────────────────────────────────────── -->
+  <text x="370" y="152" font-family="'Inter', 'Helvetica Neue', sans-serif"
+        font-size="62" font-weight="800" letter-spacing="-3"
+        fill="url(#textGrad)" filter="url(#textGlow)">
+    erango
+    <animate attributeName="opacity" values="0.85;1;0.85" dur="4s" repeatCount="indefinite"/>
+  </text>
+
+  <!-- F prefix to wordmark — offset left to align with "e" -->
+  <text x="338" y="152" font-family="'Inter', 'Helvetica Neue', sans-serif"
+        font-size="62" font-weight="800" letter-spacing="-3"
+        fill="#ffffff" filter="url(#textGlow)">
+    F
+  </text>
+
+  <!-- ── Tagline ───────────────────────────────────────── -->
+  <text x="340" y="186" font-family="'Inter', 'Helvetica Neue', sans-serif"
+        font-size="13.5" font-weight="400" fill="#8b949e" letter-spacing="0.3">
+    MongoDB GUI · Built with Rust &amp; Tauri
+  </text>
+
+  <!-- ── Version badge ─────────────────────────────────── -->
+  <rect x="340" y="210" width="68" height="22" rx="5" fill="#1c2128" stroke="#30363d" stroke-width="1"/>
+  <text x="374" y="225.5" text-anchor="middle"
+        font-family="'JetBrains Mono', monospace"
+        font-size="10" fill="#8b949e" letter-spacing="0.5">
+    v0.1.0
+  </text>
+
+  <!-- ── MIT badge ──────────────────────────────────────── -->
+  <rect x="416" y="210" width="54" height="22" rx="5" fill="#1c2128" stroke="#30363d" stroke-width="1"/>
+  <text x="443" y="225.5" text-anchor="middle"
+        font-family="'JetBrains Mono', monospace"
+        font-size="10" fill="#3fb950" letter-spacing="0.5">
+    MIT
+  </text>
+
+  <!-- ── Scanning line effect (subtle) ─────────────────── -->
+  <rect x="0" y="0" width="600" height="2" rx="1" fill="#f7941d" opacity="0">
+    <animate attributeName="y"    values="-2;342;-2"   dur="6s" repeatCount="indefinite" easing="linear"/>
+    <animate attributeName="opacity" values="0;0.06;0.06;0" dur="6s" repeatCount="indefinite"/>
+  </rect>
+
+  <!-- ── Border frame ───────────────────────────────────── -->
+  <rect x="1" y="1" width="598" height="338" rx="17" fill="none"
+        stroke="#30363d" stroke-width="1" opacity="0.7"/>
+</svg>
