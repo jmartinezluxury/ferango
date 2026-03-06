@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Ferango — MongoDB GUI for Developers</title>
+  <link rel="icon" type="image/svg+xml" href="ferango-icon.svg" />
   <meta name="description" content="A lightweight, open-source MongoDB GUI client built with Tauri 2 and Rust. Fast, cross-platform, and pleasant to use." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -299,8 +300,14 @@
     .feature-card:hover { border-color: var(--accent); }
 
     .feature-icon {
-      font-size: 1.6rem;
       margin-bottom: .9rem;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+    }
+    .feature-icon svg {
+      width: 26px;
+      height: 26px;
     }
 
     .feature-card h3 {
@@ -350,18 +357,50 @@
       background: var(--bg2);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 1.5rem;
+      padding: 1.75rem 1.5rem;
       text-align: center;
       transition: border-color .2s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
     }
 
     .dl-card:hover { border-color: var(--accent); }
 
-    .dl-icon { font-size: 2rem; margin-bottom: .6rem; }
+    .dl-icon {
+      color: var(--accent);
+      margin-bottom: .85rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .dl-icon svg { width: 36px; height: 36px; }
 
-    .dl-card h3 { font-size: 1rem; font-weight: 600; margin-bottom: .3rem; }
+    .dl-card h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: .25rem; }
 
-    .dl-card p { font-size: .82rem; color: var(--muted); margin-bottom: 1rem; }
+    .dl-arch { font-size: .78rem; color: var(--muted); margin-bottom: 1rem; }
+
+    .dl-formats {
+      display: flex;
+      gap: .4rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 1.25rem;
+    }
+
+    .dl-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .72rem;
+      color: var(--accent);
+      background: rgba(247,148,29,.1);
+      border: 1px solid rgba(247,148,29,.25);
+      border-radius: 4px;
+      padding: .15rem .45rem;
+      letter-spacing: .3px;
+    }
+
+    .dl-card .btn { width: 100%; justify-content: center; margin-top: auto; }
 
     /* ── Stack ─────────────────────────────────────────────── */
     .stack-grid {
@@ -381,7 +420,11 @@
       font-size: .85rem;
       font-weight: 500;
       color: var(--muted);
+      text-decoration: none;
+      transition: border-color .2s, color .2s;
     }
+
+    a.stack-pill:hover { border-color: var(--accent); color: var(--text); }
 
     .stack-pill b { color: var(--text); }
 
@@ -428,8 +471,7 @@
 <!-- ── Nav ──────────────────────────────────────────────────── -->
 <nav>
   <div class="nav-logo" style="display:flex;align-items:center;gap:.6rem;">
-    <img src="ferango-icon.svg" alt="" style="height:34px;width:auto;" />
-    Fer<span>ango</span>
+    <img src="ferango-icon.svg" alt="" style="height:34px;width:auto;" /><span style="color:inherit">Fer</span><span>ango</span>
   </div>
   <div class="nav-links">
     <a href="#features" class="hide-sm">Features</a>
@@ -482,47 +524,47 @@
   <p class="section-sub">Built for developers who want speed and simplicity over a feature maze.</p>
   <div class="features-grid">
     <div class="feature-card">
-      <div class="feature-icon">&#9998;</div>
+      <div class="feature-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></div>
       <h3>Monaco Editor</h3>
       <p>VS Code's engine with JavaScript syntax highlighting, IntelliSense, and field autocomplete from your collections.</p>
     </div>
     <div class="feature-card">
-      <div class="feature-icon">&#9654;</div>
+      <div class="feature-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>
       <h3>Run at cursor</h3>
       <p>Cmd+Enter executes the statement under your cursor. Select text and run only that. Or run everything with one click.</p>
     </div>
     <div class="feature-card">
-      <div class="feature-icon">&#9646;&#9646;&#9646;</div>
+      <div class="feature-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/></svg></div>
       <h3>Table / JSON / Tree views</h3>
       <p>Switch between result formats without re-running the query. Click any cell to copy its value to clipboard.</p>
     </div>
     <div class="feature-card">
-      <div class="feature-icon">&#128274;</div>
+      <div class="feature-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
       <h3>OS keychain storage</h3>
       <p>Passwords are stored in macOS Keychain, Windows DPAPI, or libsecret — never in plaintext files.</p>
     </div>
     <div class="feature-card">
-      <div class="feature-icon">&#128196;</div>
+      <div class="feature-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
       <h3>Multi-tab scripts</h3>
       <p>Open multiple scripts at once. Auto-saved on tab switch. Organized per connection in <code>~/.ferango/scripts/</code>.</p>
     </div>
     <div class="feature-card">
-      <div class="feature-icon">&#128295;</div>
+      <div class="feature-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></div>
       <h3>Collection tools</h3>
       <p>Right-click any collection: insert document, view stats, infer schema, list indexes, create or drop.</p>
     </div>
     <div class="feature-card">
-      <div class="feature-icon">&#128200;</div>
+      <div class="feature-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div>
       <h3>Schema inference</h3>
       <p>Sample N documents to detect field types and presence percentage — without ever writing a MapReduce.</p>
     </div>
     <div class="feature-card">
-      <div class="feature-icon">&#128190;</div>
+      <div class="feature-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div>
       <h3>Export results</h3>
       <p>Download query results as CSV or JSON with a single click from any view.</p>
     </div>
     <div class="feature-card">
-      <div class="feature-icon">&#9728;</div>
+      <div class="feature-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></div>
       <h3>Dark &amp; light theme</h3>
       <p>Toggle from the toolbar. Font size adjustable from 10 to 24px. Your eyes, your call.</p>
     </div>
@@ -564,27 +606,38 @@
   <p class="section-sub">Pre-built binaries available on GitHub Releases. No account required.</p>
   <div class="download-grid">
     <div class="dl-card">
-      <div class="dl-icon">&#63743;</div>
+      <div class="dl-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg></div>
       <h3>macOS</h3>
-      <p>Universal binary — Apple Silicon + Intel</p>
-      <a href="https://github.com/jmartinezluxury/ferango/releases/latest" target="_blank" rel="noopener" class="btn btn-primary" style="width:100%;justify-content:center">
-        Download .dmg
+      <p class="dl-arch">Apple Silicon &middot; Intel</p>
+      <div class="dl-formats">
+        <span class="dl-badge">.dmg</span>
+      </div>
+      <a href="https://github.com/jmartinezluxury/ferango/releases/latest" target="_blank" rel="noopener" class="btn btn-primary">
+        Download for macOS
       </a>
     </div>
     <div class="dl-card">
-      <div class="dl-icon">&#129695;</div>
+      <div class="dl-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M3 5.6L10.5 4.5V11.5H3V5.6zM11.5 4.35L21 3V11.5H11.5V4.35zM3 12.5H10.5V19.5L3 18.4V12.5zM11.5 12.5H21V21L11.5 19.65V12.5z"/></svg></div>
       <h3>Windows</h3>
-      <p>x86_64 — .msi or NSIS installer</p>
-      <a href="https://github.com/jmartinezluxury/ferango/releases/latest" target="_blank" rel="noopener" class="btn btn-primary" style="width:100%;justify-content:center">
-        Download .msi
+      <p class="dl-arch">x86_64</p>
+      <div class="dl-formats">
+        <span class="dl-badge">.msi</span>
+        <span class="dl-badge">.exe</span>
+      </div>
+      <a href="https://github.com/jmartinezluxury/ferango/releases/latest" target="_blank" rel="noopener" class="btn btn-primary">
+        Download for Windows
       </a>
     </div>
     <div class="dl-card">
-      <div class="dl-icon">&#128039;</div>
+      <div class="dl-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><polyline points="7 8 10 11 7 14"/><line x1="13" y1="14" x2="17" y2="14"/></svg></div>
       <h3>Linux</h3>
-      <p>x86_64 — .AppImage or .deb</p>
-      <a href="https://github.com/jmartinezluxury/ferango/releases/latest" target="_blank" rel="noopener" class="btn btn-primary" style="width:100%;justify-content:center">
-        Download .AppImage
+      <p class="dl-arch">x86_64</p>
+      <div class="dl-formats">
+        <span class="dl-badge">.AppImage</span>
+        <span class="dl-badge">.deb</span>
+      </div>
+      <a href="https://github.com/jmartinezluxury/ferango/releases/latest" target="_blank" rel="noopener" class="btn btn-primary">
+        Download for Linux
       </a>
     </div>
   </div>
@@ -601,13 +654,13 @@
   <h2 class="section-title">Built on solid foundations</h2>
   <p class="section-sub" style="margin-bottom:2rem">Native performance with a modern web frontend.</p>
   <div class="stack-grid">
-    <div class="stack-pill"><b>Tauri 2</b> &mdash; Rust backend</div>
-    <div class="stack-pill"><b>Vue 3</b> &mdash; frontend</div>
-    <div class="stack-pill"><b>TypeScript</b> &mdash; type safety</div>
-    <div class="stack-pill"><b>Monaco Editor</b> &mdash; query editing</div>
-    <div class="stack-pill"><b>Pinia</b> &mdash; state management</div>
-    <div class="stack-pill"><b>mongodb (Rust)</b> &mdash; official driver</div>
-    <div class="stack-pill"><b>keyring</b> &mdash; OS credential store</div>
+    <a href="https://tauri.app" target="_blank" rel="noopener" class="stack-pill"><b>Tauri 2</b> &mdash; Rust backend</a>
+    <a href="https://vuejs.org" target="_blank" rel="noopener" class="stack-pill"><b>Vue 3</b> &mdash; frontend</a>
+    <a href="https://www.typescriptlang.org" target="_blank" rel="noopener" class="stack-pill"><b>TypeScript</b> &mdash; type safety</a>
+    <a href="https://microsoft.github.io/monaco-editor/" target="_blank" rel="noopener" class="stack-pill"><b>Monaco Editor</b> &mdash; query editing</a>
+    <a href="https://pinia.vuejs.org" target="_blank" rel="noopener" class="stack-pill"><b>Pinia</b> &mdash; state management</a>
+    <a href="https://www.mongodb.com/docs/drivers/rust/current/" target="_blank" rel="noopener" class="stack-pill"><b>mongodb (Rust)</b> &mdash; official driver</a>
+    <a href="https://crates.io/crates/keyring" target="_blank" rel="noopener" class="stack-pill"><b>keyring</b> &mdash; OS credential store</a>
   </div>
 </section>
 
