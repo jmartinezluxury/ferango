@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://jmartinezluxury.github.io/ferango/ferango.svg" width="420" alt="Ferango" />
+</p>
+
 # Ferango
 
 A lightweight, open-source MongoDB GUI client for developers. Built with Tauri 2, Vue 3, and the official MongoDB Rust driver.
