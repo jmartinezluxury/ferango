@@ -7,7 +7,7 @@ use std::path::PathBuf;
 // ─── Keychain helpers ─────────────────────────────────────────────────────────
 
 fn keychain_entry(conn_id: &str) -> Option<Entry> {
-    Entry::new("dbmongor", conn_id).ok()
+    Entry::new("ferango", conn_id).ok()
 }
 
 fn store_password(conn_id: &str, password: &str) {
@@ -95,7 +95,7 @@ impl Default for AppSettings {
 
 fn base_dir() -> PathBuf {
     let home = dirs::home_dir().expect("Cannot find home directory");
-    home.join(".dbmongor")
+    home.join(".ferango")
 }
 
 fn connections_file() -> PathBuf {
@@ -451,7 +451,7 @@ pub fn export_scripts_zip() -> Result<String, String> {
     let output = dirs::download_dir()
         .or_else(dirs::home_dir)
         .unwrap_or_else(|| PathBuf::from("."))
-        .join(format!("dbmongor-scripts-{}.zip", ts));
+        .join(format!("ferango-scripts-{}.zip", ts));
 
     let file = fs::File::create(&output).map_err(|e| e.to_string())?;
     let mut zip = zip::ZipWriter::new(file);

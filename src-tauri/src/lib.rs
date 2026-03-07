@@ -50,5 +50,5 @@ pub fn run() {
             ssh::close_tunnel,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running dbmongoR");
+        .expect("error while running Ferango");
 }
