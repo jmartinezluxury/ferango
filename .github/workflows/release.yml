@@ -84,27 +84,22 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # ── macOS code signing (optional — set these secrets to enable) ──────
-          # APPLE_CERTIFICATE:          base64-encoded .p12 Developer ID certificate
-          # APPLE_CERTIFICATE_PASSWORD: password for the .p12 file
-          # APPLE_SIGNING_IDENTITY:     e.g. "Developer ID Application: Name (TEAMID)"
-          # APPLE_ID:                   your Apple ID email (for notarization)
-          # APPLE_PASSWORD:             app-specific password from appleid.apple.com
-          # APPLE_TEAM_ID:              your 10-character Apple Team ID
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          # ── Windows code signing (optional) ──────────────────────────────────
-          # TAURI_SIGNING_PRIVATE_KEY:          base64-encoded signing key
-          # TAURI_SIGNING_PRIVATE_KEY_PASSWORD: password for the signing key
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # ── Signing secrets (only pass when the secret is actually set) ───────
+          # macOS: APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD,
+          #        APPLE_SIGNING_IDENTITY, APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID
+          # Windows: TAURI_SIGNING_PRIVATE_KEY, TAURI_SIGNING_PRIVATE_KEY_PASSWORD
+          # Add the secrets to the repo and uncomment below to enable signing:
+          # APPLE_CERTIFICATE:          ${{ secrets.APPLE_CERTIFICATE }}
+          # APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          # APPLE_SIGNING_IDENTITY:     ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          # APPLE_ID:                   ${{ secrets.APPLE_ID }}
+          # APPLE_PASSWORD:             ${{ secrets.APPLE_PASSWORD }}
+          # APPLE_TEAM_ID:              ${{ secrets.APPLE_TEAM_ID }}
+          # TAURI_SIGNING_PRIVATE_KEY:          ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          # TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'dbmongoR ${{ github.ref_name }}'
+          releaseName: 'Ferango ${{ github.ref_name }}'
           releaseBody: |
             ## What's new
 
@@ -118,7 +113,7 @@ jobs:
             | Windows | `.msi` or `.exe` |
             | Linux | `.AppImage` or `.deb` |
 
-            > **macOS note:** If you see "unidentified developer", right-click the app and choose Open, or run `xattr -cr /Applications/dbmongoR.app`.
+            > **macOS note:** If you see "unidentified developer", right-click the app and choose Open, or run `xattr -cr /Applications/Ferango.app`.
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.build_args }}
