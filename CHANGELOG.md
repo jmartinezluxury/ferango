@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.1.1] — 2026-03-07
+
+### Fixed
+- Remove unnecessary `mut` on cursor variable (clippy `unused-mut`)
+- Use `next_back()` instead of `last()` on `DoubleEndedIterator` (clippy `double-ended-iterator-last`)
+- Replace `.map()` on `Option` returning unit with `if let` (clippy `option-map-unit-fn`)
+- Remove needless borrows on `&args` passed to generic functions (clippy `needless-borrows-for-generic-args`)
+
 ## [0.1.0] — 2026-03-06
 
 Initial public release.
@@ -68,4 +76,5 @@ Initial public release.
 - Font size adjustable from 10 to 24px
 - Keyboard shortcuts reference panel
 
+[0.1.1]: https://github.com/jmartinezluxury/ferango/releases/tag/v0.1.1
 [0.1.0]: https://github.com/jmartinezluxury/ferango/releases/tag/v0.1.0

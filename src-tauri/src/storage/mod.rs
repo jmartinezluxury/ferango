@@ -466,7 +466,7 @@ pub fn export_scripts_zip() -> Result<String, String> {
             if !fname.ends_with(".js") { continue; }
             let zip_path = format!("{}/{}", folder_name, fname);
             zip.start_file(zip_path, options).map_err(|e| e.to_string())?;
-            let content = fs::read(&file_entry.path()).map_err(|e| e.to_string())?;
+            let content = fs::read(file_entry.path()).map_err(|e| e.to_string())?;
             zip.write_all(&content).map_err(|e| e.to_string())?;
         }
     }

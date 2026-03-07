@@ -159,7 +159,7 @@ async fn get_client(
                 .trim_start_matches("mongodb://");
             let hp = stripped.split('/').next().unwrap_or("");
             // strip credentials
-            let hp = hp.split('@').last().unwrap_or(hp);
+            let hp = hp.split('@').next_back().unwrap_or(hp);
             let (h, p) = hp.split_once(':').unwrap_or((hp, "27017"));
             (h.to_string(), p.to_string())
         } else {
@@ -258,7 +258,7 @@ pub async fn disconnect(
     tunnels: State<'_, TunnelPool>,
 ) -> Result<(), String> {
     pool.0.lock().map_err(|e| e.to_string())?.remove(&conn_id);
-    tunnels.0.lock().map_err(|e| e.to_string())?.remove(&conn_id).map(|mut c| { let _ = c.kill(); });
+    if let Some(mut c) = tunnels.0.lock().map_err(|e| e.to_string())?.remove(&conn_id) { let _ = c.kill(); }
     Ok(())
 }
 
@@ -363,7 +363,7 @@ async fn run_query(db: &mongodb::Database, query: &str) -> Result<Vec<serde_json
     // ── find ──────────────────────────────────────────────────────────────────
     if op.starts_with("find(") {
         let args = extract_parens_content(op, "find")?;
-        let (filter, opts_doc) = parse_two_docs(&args)?;
+        let (filter, opts_doc) = parse_two_docs(args)?;
         let mut find = col.find(filter);
         if let Some(proj) = opts_doc {
             // projection as second arg
@@ -386,7 +386,7 @@ async fn run_query(db: &mongodb::Database, query: &str) -> Result<Vec<serde_json
     // ── findOne ───────────────────────────────────────────────────────────────
     if op.starts_with("findOne(") {
         let args = extract_parens_content(op, "findOne")?;
-        let (filter, _) = parse_two_docs(&args)?;
+        let (filter, _) = parse_two_docs(args)?;
         let doc = col
             .find_one(filter)
             .await
@@ -399,7 +399,7 @@ async fn run_query(db: &mongodb::Database, query: &str) -> Result<Vec<serde_json
     // ── aggregate ─────────────────────────────────────────────────────────────
     if op.starts_with("aggregate(") {
         let args = extract_parens_content(op, "aggregate")?;
-        let pipeline = parse_pipeline(&args)?;
+        let pipeline = parse_pipeline(args)?;
         let mut cursor = col.aggregate(pipeline).await.map_err(|e| e.to_string())?;
         return collect_cursor(&mut cursor).await;
     }
@@ -408,7 +408,7 @@ async fn run_query(db: &mongodb::Database, query: &str) -> Result<Vec<serde_json
     if op.starts_with("countDocuments(") || op.starts_with("count(") {
         let fname = if op.starts_with("countDocuments(") { "countDocuments" } else { "count" };
         let args = extract_parens_content(op, fname)?;
-        let (filter, _) = parse_two_docs(&args)?;
+        let (filter, _) = parse_two_docs(args)?;
         let n = col.count_documents(filter).await.map_err(|e| e.to_string())?;
         return Ok(vec![serde_json::json!({ "count": n })]);
     }
@@ -416,7 +416,7 @@ async fn run_query(db: &mongodb::Database, query: &str) -> Result<Vec<serde_json
     // ── insertOne ─────────────────────────────────────────────────────────────
     if op.starts_with("insertOne(") {
         let args = extract_parens_content(op, "insertOne")?;
-        let doc: Document = parse_doc(&args)?;
+        let doc: Document = parse_doc(args)?;
         let res = col.insert_one(doc).await.map_err(|e| e.to_string())?;
         let id = res.inserted_id.to_string();
         return Ok(vec![serde_json::json!({ "insertedId": id, "acknowledged": true })]);
@@ -425,7 +425,7 @@ async fn run_query(db: &mongodb::Database, query: &str) -> Result<Vec<serde_json
     // ── insertMany ────────────────────────────────────────────────────────────
     if op.starts_with("insertMany(") {
         let args = extract_parens_content(op, "insertMany")?;
-        let docs = parse_pipeline(&args)?;
+        let docs = parse_pipeline(args)?;
         let res = col.insert_many(docs).await.map_err(|e| e.to_string())?;
         let ids: Vec<String> = res.inserted_ids.values().map(|v| v.to_string()).collect();
         return Ok(vec![serde_json::json!({ "insertedCount": ids.len(), "insertedIds": ids })]);
@@ -435,7 +435,7 @@ async fn run_query(db: &mongodb::Database, query: &str) -> Result<Vec<serde_json
     if op.starts_with("updateOne(") || op.starts_with("updateMany(") {
         let fname = if op.starts_with("updateOne(") { "updateOne" } else { "updateMany" };
         let args = extract_parens_content(op, fname)?;
-        let (filter, update) = parse_two_docs(&args)?;
+        let (filter, update) = parse_two_docs(args)?;
         let update = update.ok_or("updateOne/updateMany requires a second argument (update)")?;
         let res = if fname == "updateOne" {
             let r = col.update_one(filter, update).await.map_err(|e| e.to_string())?;
@@ -451,7 +451,7 @@ async fn run_query(db: &mongodb::Database, query: &str) -> Result<Vec<serde_json
     if op.starts_with("deleteOne(") || op.starts_with("deleteMany(") {
         let fname = if op.starts_with("deleteOne(") { "deleteOne" } else { "deleteMany" };
         let args = extract_parens_content(op, fname)?;
-        let (filter, _) = parse_two_docs(&args)?;
+        let (filter, _) = parse_two_docs(args)?;
         let n = if fname == "deleteOne" {
             col.delete_one(filter).await.map_err(|e| e.to_string())?.deleted_count
         } else {
@@ -1074,7 +1074,7 @@ pub async fn infer_schema(
     use mongodb::options::FindOptions;
     use futures_util::TryStreamExt;
     let opts = FindOptions::builder().limit(sample_size as i64).build();
-    let mut cursor = col.find(doc! {}).with_options(opts).await.map_err(|e| e.to_string())?;
+    let cursor = col.find(doc! {}).with_options(opts).await.map_err(|e| e.to_string())?;
     let docs: Vec<Document> = cursor.try_collect().await.map_err(|e| e.to_string())?;
 
     let total = docs.len();

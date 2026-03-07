@@ -27,6 +27,7 @@ fn free_port() -> Result<u16, String> {
 // ─── Tauri commands ───────────────────────────────────────────────────────────
 
 /// Internal (non-tauri) version: open or reuse a tunnel, return local port.
+#[allow(clippy::too_many_arguments)]
 pub fn open_tunnel_internal(
     conn_id: &str,
     ssh_host: &str,
@@ -79,6 +80,7 @@ pub fn open_tunnel_internal(
 
 /// Tauri command: open an SSH tunnel and return the local port.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub fn open_tunnel(
     conn_id: String,
     ssh_host: String,
