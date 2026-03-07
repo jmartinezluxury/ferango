@@ -1,0 +1,71 @@
+# Changelog
+
+All notable changes to Ferango will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+---
+
+## [0.1.0] — 2026-03-06
+
+Initial public release.
+
+### Added
+
+#### Editor
+- Monaco Editor (VS Code engine) with JavaScript syntax highlighting
+- mongosh syntax support — write queries exactly as in a terminal
+- `Cmd+Enter` / `Ctrl+Enter` to run the statement at cursor
+- Run selected text with `Cmd+Enter` after selecting
+- Run all statements in the file with one click
+- Format document with `Shift+Alt+F`
+- Field autocomplete — field names from the active collection populate as you type
+- Snippets for common patterns: `find`, `aggregate`, `updateOne`, and more
+- Multi-tab support — open multiple scripts at once, auto-saved on tab switch
+
+#### Results
+- Table, JSON, and Tree views — switch without re-running the query
+- Multi-statement results — each statement gets its own result tab
+- Pagination via skip + limit without editing your query
+- Click any cell to copy its value to clipboard
+- Full document side panel — click a row to see the complete document
+- Export results as CSV or JSON
+
+#### Connections
+- Connection tree: browse connections → databases → collections in the sidebar
+- Connection groups — organize connections into named folders
+- OS keychain storage — passwords saved in macOS Keychain, Windows DPAPI, or libsecret
+
+#### Collection tools (right-click menu)
+- Find all documents
+- Insert document via JSON editor modal
+- Collection stats — document count, storage size, avg object size, index count
+- View indexes — list all indexes with keys, unique, and sparse flags
+- Infer schema — sample documents to detect field types and presence percentage
+- Create and drop collections
+- Drop database
+
+#### Scripts & history
+- Scripts saved to `~/.ferango/scripts/<connection-name>/`
+- Browse, rename, and delete scripts from the Scripts panel
+- Every executed query logged automatically per connection
+- Click a history entry to open it in a new tab
+
+#### Supported operations
+- `find()`, `findOne()`, `aggregate()`
+- `countDocuments()`, `count()`
+- `insertOne()`, `insertMany()`
+- `updateOne()`, `updateMany()`
+- `deleteOne()`, `deleteMany()`
+- `drop()`
+- BSON types: `ObjectId()`, `ISODate()`, `new Date()`, `NumberInt()`, `NumberLong()`, `NumberDecimal()`
+- Regex literals: `/pattern/flags`
+- Chained modifiers: `.sort()`, `.limit()`, `.skip()`
+
+#### Appearance
+- Dark and light theme toggle
+- Font size adjustable from 10 to 24px
+- Keyboard shortcuts reference panel
+
+[0.1.0]: https://github.com/jmartinezluxury/ferango/releases/tag/v0.1.0
