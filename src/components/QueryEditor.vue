@@ -71,6 +71,127 @@ onMounted(() => {
     },
   })
 
+  // Register MongoDB operator completions (triggered by '$')
+  monaco.languages.registerCompletionItemProvider('javascript', {
+    triggerCharacters: ['$'],
+    provideCompletionItems(model, position) {
+      // Determine the range to replace: from the '$' to the current cursor
+      const lineContent = model.getLineContent(position.lineNumber)
+      let startCol = position.column
+      // Walk back to find the '$' that triggered this
+      while (startCol > 1 && lineContent[startCol - 2] !== '$') startCol--
+      if (startCol > 1 && lineContent[startCol - 2] === '$') startCol-- // include the '$'
+      const range = {
+        startLineNumber: position.lineNumber, endLineNumber: position.lineNumber,
+        startColumn: startCol, endColumn: position.column,
+      }
+
+      const operators: { label: string; doc: string; text: string; kind: monaco.languages.CompletionItemKind }[] = [
+        // ── Comparison ──
+        { label: '$eq',  doc: 'Matches values equal to a specified value', text: '\\$eq: ${1:value}', kind: monaco.languages.CompletionItemKind.Operator },
+        { label: '$ne',  doc: 'Matches values not equal to a specified value', text: '\\$ne: ${1:value}', kind: monaco.languages.CompletionItemKind.Operator },
+        { label: '$gt',  doc: 'Matches values greater than a specified value', text: '\\$gt: ${1:value}', kind: monaco.languages.CompletionItemKind.Operator },
+        { label: '$gte', doc: 'Matches values greater than or equal to a specified value', text: '\\$gte: ${1:value}', kind: monaco.languages.CompletionItemKind.Operator },
+        { label: '$lt',  doc: 'Matches values less than a specified value', text: '\\$lt: ${1:value}', kind: monaco.languages.CompletionItemKind.Operator },
+        { label: '$lte', doc: 'Matches values less than or equal to a specified value', text: '\\$lte: ${1:value}', kind: monaco.languages.CompletionItemKind.Operator },
+        { label: '$in',  doc: 'Matches any of the values specified in an array', text: '\\$in: [${1}]', kind: monaco.languages.CompletionItemKind.Operator },
+        { label: '$nin', doc: 'Matches none of the values specified in an array', text: '\\$nin: [${1}]', kind: monaco.languages.CompletionItemKind.Operator },
+        // ── Logical ──
+        { label: '$and', doc: 'Joins query clauses with a logical AND', text: '\\$and: [{ ${1} }, { ${2} }]', kind: monaco.languages.CompletionItemKind.Operator },
+        { label: '$or',  doc: 'Joins query clauses with a logical OR', text: '\\$or: [{ ${1} }, { ${2} }]', kind: monaco.languages.CompletionItemKind.Operator },
+        { label: '$not', doc: 'Inverts the effect of a query expression', text: '\\$not: { ${1} }', kind: monaco.languages.CompletionItemKind.Operator },
+        { label: '$nor', doc: 'Joins query clauses with a logical NOR', text: '\\$nor: [{ ${1} }, { ${2} }]', kind: monaco.languages.CompletionItemKind.Operator },
+        // ── Element ──
+        { label: '$exists', doc: 'Matches documents that have the specified field', text: '\\$exists: ${1:true}', kind: monaco.languages.CompletionItemKind.Operator },
+        { label: '$type',   doc: 'Selects documents if a field is of the specified type', text: '\\$type: "${1:string}"', kind: monaco.languages.CompletionItemKind.Operator },
+        // ── Array ──
+        { label: '$all',       doc: 'Matches arrays that contain all specified elements', text: '\\$all: [${1}]', kind: monaco.languages.CompletionItemKind.Operator },
+        { label: '$elemMatch', doc: 'Matches documents that contain an array element matching all conditions', text: '\\$elemMatch: { ${1} }', kind: monaco.languages.CompletionItemKind.Operator },
+        { label: '$size',      doc: 'Matches arrays with the specified number of elements', text: '\\$size: ${1:1}', kind: monaco.languages.CompletionItemKind.Operator },
+        // ── Evaluation ──
+        { label: '$regex',  doc: 'Selects documents matching a regular expression', text: '\\$regex: /${1:pattern}/${2:flags}', kind: monaco.languages.CompletionItemKind.Operator },
+        { label: '$expr',   doc: 'Use aggregation expressions within the query language', text: '\\$expr: { ${1} }', kind: monaco.languages.CompletionItemKind.Operator },
+        // ── Update ──
+        { label: '$set',      doc: 'Sets the value of a field', text: '\\$set: { ${1:field}: ${2:value} }', kind: monaco.languages.CompletionItemKind.Function },
+        { label: '$unset',    doc: 'Removes the specified field from a document', text: '\\$unset: { ${1:field}: "" }', kind: monaco.languages.CompletionItemKind.Function },
+        { label: '$inc',      doc: 'Increments the value of a field by a specified amount', text: '\\$inc: { ${1:field}: ${2:1} }', kind: monaco.languages.CompletionItemKind.Function },
+        { label: '$push',     doc: 'Adds an element to an array', text: '\\$push: { ${1:field}: ${2:value} }', kind: monaco.languages.CompletionItemKind.Function },
+        { label: '$pull',     doc: 'Removes all elements from an array that match a condition', text: '\\$pull: { ${1:field}: ${2:value} }', kind: monaco.languages.CompletionItemKind.Function },
+        { label: '$addToSet', doc: 'Adds a value to an array only if it doesn\'t already exist', text: '\\$addToSet: { ${1:field}: ${2:value} }', kind: monaco.languages.CompletionItemKind.Function },
+        { label: '$rename',   doc: 'Renames a field', text: '\\$rename: { "${1:oldName}": "${2:newName}" }', kind: monaco.languages.CompletionItemKind.Function },
+        { label: '$min',      doc: 'Updates the field if the specified value is less than the existing value', text: '\\$min: { ${1:field}: ${2:value} }', kind: monaco.languages.CompletionItemKind.Function },
+        { label: '$max',      doc: 'Updates the field if the specified value is greater than the existing value', text: '\\$max: { ${1:field}: ${2:value} }', kind: monaco.languages.CompletionItemKind.Function },
+        { label: '$mul',      doc: 'Multiplies the value of a field by a specified amount', text: '\\$mul: { ${1:field}: ${2:value} }', kind: monaco.languages.CompletionItemKind.Function },
+        // ── Aggregation stages ──
+        { label: '$match',   doc: 'Filters documents to pass only matching documents to the next stage', text: '\\$match: { ${1} }', kind: monaco.languages.CompletionItemKind.Module },
+        { label: '$group',   doc: 'Groups documents by a specified expression', text: '\\$group: { _id: ${1:null}, ${2:field}: { \\$sum: ${3:1} } }', kind: monaco.languages.CompletionItemKind.Module },
+        { label: '$project', doc: 'Reshapes documents by including, excluding, or adding fields', text: '\\$project: { ${1:field}: 1 }', kind: monaco.languages.CompletionItemKind.Module },
+        { label: '$sort',    doc: 'Sorts all documents', text: '\\$sort: { ${1:field}: ${2:-1} }', kind: monaco.languages.CompletionItemKind.Module },
+        { label: '$limit',   doc: 'Limits the number of documents passed to the next stage', text: '\\$limit: ${1:20}', kind: monaco.languages.CompletionItemKind.Module },
+        { label: '$skip',    doc: 'Skips over the specified number of documents', text: '\\$skip: ${1:0}', kind: monaco.languages.CompletionItemKind.Module },
+        { label: '$lookup',  doc: 'Performs a left outer join to another collection', text: '\\$lookup: {\n\tfrom: "${1:collection}",\n\tlocalField: "${2:field}",\n\tforeignField: "${3:_id}",\n\tas: "${4:result}"\n}', kind: monaco.languages.CompletionItemKind.Module },
+        { label: '$unwind',  doc: 'Deconstructs an array field into a document per element', text: '\\$unwind: "\\$${1:field}"', kind: monaco.languages.CompletionItemKind.Module },
+        { label: '$count',   doc: 'Returns a count of the documents at this stage', text: '\\$count: "${1:total}"', kind: monaco.languages.CompletionItemKind.Module },
+        { label: '$out',     doc: 'Writes the result of the pipeline to a collection', text: '\\$out: "${1:collection}"', kind: monaco.languages.CompletionItemKind.Module },
+        { label: '$merge',   doc: 'Merges the result of the pipeline into a collection', text: '\\$merge: { into: "${1:collection}" }', kind: monaco.languages.CompletionItemKind.Module },
+        { label: '$bucket',  doc: 'Categorizes documents into groups (buckets)', text: '\\$bucket: {\n\tgroupBy: "\\$${1:field}",\n\tboundaries: [${2:0, 100, 200}],\n\tdefault: "Other"\n}', kind: monaco.languages.CompletionItemKind.Module },
+        { label: '$facet',   doc: 'Process multiple aggregation pipelines in a single stage', text: '\\$facet: {\n\t${1:output}: [{ ${2} }]\n}', kind: monaco.languages.CompletionItemKind.Module },
+        { label: '$replaceRoot', doc: 'Replaces the document with the specified embedded document', text: '\\$replaceRoot: { newRoot: "\\$${1:field}" }', kind: monaco.languages.CompletionItemKind.Module },
+        // ── Accumulators (inside $group) ──
+        { label: '$sum',   doc: 'Calculates the sum', text: '\\$sum: ${1:1}', kind: monaco.languages.CompletionItemKind.Operator },
+        { label: '$avg',   doc: 'Calculates the average', text: '\\$avg: "\\$${1:field}"', kind: monaco.languages.CompletionItemKind.Operator },
+        { label: '$first', doc: 'Returns the first value in a group', text: '\\$first: "\\$${1:field}"', kind: monaco.languages.CompletionItemKind.Operator },
+        { label: '$last',  doc: 'Returns the last value in a group', text: '\\$last: "\\$${1:field}"', kind: monaco.languages.CompletionItemKind.Operator },
+      ]
+      return {
+        suggestions: operators.map((op, i) => ({
+          label: op.label,
+          filterText: op.label.slice(1), // match without '$' so typing 'so' matches '$sort'
+          kind: op.kind,
+          documentation: op.doc,
+          insertText: op.text,
+          insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+          range,
+          sortText: String(i).padStart(3, '0'),
+        })),
+      }
+    },
+  })
+
+  // Register chained method completions (.sort, .limit, .skip after find/aggregate)
+  monaco.languages.registerCompletionItemProvider('javascript', {
+    triggerCharacters: ['.'],
+    provideCompletionItems(model, position) {
+      const textBefore = model.getValueInRange({
+        startLineNumber: 1, startColumn: 1,
+        endLineNumber: position.lineNumber, endColumn: position.column,
+      })
+      // Only suggest after a query chain (find, aggregate, sort, limit, skip)
+      if (!/\.\s*(find|findOne|aggregate|sort|limit|skip)\s*\(/.test(textBefore)) return { suggestions: [] }
+
+      const word = model.getWordUntilPosition(position)
+      const range = {
+        startLineNumber: position.lineNumber, endLineNumber: position.lineNumber,
+        startColumn: word.startColumn, endColumn: word.endColumn,
+      }
+      const methods = [
+        { label: 'sort',  doc: 'Sort results by field(s)', text: 'sort({ ${1:field}: ${2:-1} })' },
+        { label: 'limit', doc: 'Limit the number of results', text: 'limit(${1:20})' },
+        { label: 'skip',  doc: 'Skip a number of results', text: 'skip(${1:0})' },
+      ]
+      return {
+        suggestions: methods.map(m => ({
+          label: m.label,
+          kind: monaco.languages.CompletionItemKind.Method,
+          documentation: m.doc,
+          insertText: m.text,
+          insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+          range,
+        })),
+      }
+    },
+  })
+
   // Ctrl+Enter / Cmd+Enter → run statement at cursor (or selection)
   monacoEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, runAtCursor)
 
@@ -286,12 +407,17 @@ function extractStatementAtCursor(text: string, offset: number): string {
     }
   }
 
-  const result = text.slice(start, end).trim()
+  const raw = text.slice(start, end)
+  const result = stripLineComments(raw).trim()
   // Cursor is right after a ';' → fall back to the statement that ended there
   if (!result && lastSemi >= 0) {
-    return text.slice(prevStart, lastSemi).trim()
+    return stripLineComments(text.slice(prevStart, lastSemi)).trim()
   }
   return result
+}
+
+function stripLineComments(s: string): string {
+  return s.split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n')
 }
 
 function extractAllStatements(text: string): string[] {
