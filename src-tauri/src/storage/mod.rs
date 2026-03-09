@@ -80,14 +80,34 @@ pub struct AppSettings {
     pub font_size: u32,
     #[serde(default)]
     pub last_dbs: std::collections::HashMap<String, String>,
+    #[serde(default = "default_ai_enabled")]
+    pub ai_enabled: bool,
+    #[serde(default = "default_ai_provider")]
+    pub ai_provider: String,
+    #[serde(default = "default_ai_endpoint")]
+    pub ai_endpoint: String,
+    #[serde(default = "default_ai_model")]
+    pub ai_model: String,
 }
 
 fn default_theme() -> String { "dark".to_string() }
 fn default_font_size() -> u32 { 13 }
+fn default_ai_enabled() -> bool { true }
+fn default_ai_provider() -> String { "ollama".to_string() }
+fn default_ai_endpoint() -> String { "http://localhost:11434".to_string() }
+fn default_ai_model() -> String { "codellama:7b".to_string() }
 
 impl Default for AppSettings {
     fn default() -> Self {
-        AppSettings { theme: default_theme(), font_size: default_font_size(), last_dbs: Default::default() }
+        AppSettings {
+            theme: default_theme(),
+            font_size: default_font_size(),
+            last_dbs: Default::default(),
+            ai_enabled: default_ai_enabled(),
+            ai_provider: default_ai_provider(),
+            ai_endpoint: default_ai_endpoint(),
+            ai_model: default_ai_model(),
+        }
     }
 }
 

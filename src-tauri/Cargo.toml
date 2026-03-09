@@ -1,6 +1,6 @@
 [package]
 name = "ferango"
-version = "0.1.1"
+version = "0.2.0"
 description = "Fast, lightweight MongoDB GUI — built with Rust and Tauri"
 authors = ["Ferango contributors"]
 edition = "2021"
@@ -26,3 +26,4 @@ dirs = "5"
 futures-util = "0.3.32"
 zip = "2"
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
+reqwest = { version = "0.12", features = ["json"] }

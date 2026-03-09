@@ -5,7 +5,7 @@ import { useEditorStore } from '../stores/editor'
 import type { StatementResult } from '../stores/editor'
 import { useConnectionsStore } from '../stores/connections'
 import { useSettingsStore } from '../stores/settings'
-import { executeQuery, getFieldPaths, logQuery } from '../lib/tauri'
+import { executeQuery, getFieldPaths, logQuery, aiComplete } from '../lib/tauri'
 
 const editorStore = useEditorStore()
 const connStore = useConnectionsStore()
@@ -16,6 +16,8 @@ const containerEl = ref<HTMLDivElement | null>(null)
 let monacoEditor: monaco.editor.IStandaloneCodeEditor | null = null
 let autoSaveTimer: ReturnType<typeof setTimeout> | null = null
 let completionDisposable: monaco.IDisposable | null = null
+let inlineDisposable: monaco.IDisposable | null = null
+let cachedFields: string[] = []
 
 // ── Monaco setup ──────────────────────────────────────────────────────────────
 onMounted(() => {
@@ -192,6 +194,67 @@ onMounted(() => {
     },
   })
 
+  // ── AI Inline Completions ────────────────────────────────────────────────────
+  inlineDisposable = monaco.languages.registerInlineCompletionsProvider('javascript', {
+    provideInlineCompletions: async (model, position, _context, token) => {
+      if (!settingsStore.aiEnabled) return { items: [] }
+
+      // Get text before and after cursor
+      const prefix = model.getValueInRange({
+        startLineNumber: 1, startColumn: 1,
+        endLineNumber: position.lineNumber, endColumn: position.column,
+      })
+      const totalLines = model.getLineCount()
+      const suffix = model.getValueInRange({
+        startLineNumber: position.lineNumber, startColumn: position.column,
+        endLineNumber: totalLines, endColumn: model.getLineMaxColumn(totalLines),
+      })
+
+      // Skip if prefix is too short
+      if (prefix.trim().length < 3) return { items: [] }
+
+      // Debounce: wait 600ms, bail if cancelled
+      const cancelled = await new Promise<boolean>((resolve) => {
+        const timer = setTimeout(() => resolve(false), 600)
+        token.onCancellationRequested(() => { clearTimeout(timer); resolve(true) })
+      })
+      if (cancelled || token.isCancellationRequested) return { items: [] }
+
+      // Limit context window
+      const prefixLines = prefix.split('\n')
+      const trimmedPrefix = prefixLines.slice(-50).join('\n')
+      const suffixLines = suffix.split('\n')
+      const trimmedSuffix = suffixLines.slice(0, 10).join('\n')
+
+      try {
+        const resp = await aiComplete({
+          prefix: trimmedPrefix,
+          suffix: trimmedSuffix,
+          collection: connStore.activeCollection || undefined,
+          db: connStore.activeDb || undefined,
+          field_names: cachedFields,
+        })
+
+        if (token.isCancellationRequested || !resp.text) return { items: [] }
+
+        return {
+          items: [{
+            insertText: resp.text,
+            range: {
+              startLineNumber: position.lineNumber,
+              startColumn: position.column,
+              endLineNumber: position.lineNumber,
+              endColumn: position.column,
+            },
+          }],
+        }
+      } catch {
+        return { items: [] }
+      }
+    },
+    disposeInlineCompletions: () => {},
+  })
+
   // Ctrl+Enter / Cmd+Enter → run statement at cursor (or selection)
   monacoEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, runAtCursor)
 
@@ -210,6 +273,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  inlineDisposable?.dispose()
   completionDisposable?.dispose()
   monacoEditor?.dispose()
   if (autoSaveTimer) clearTimeout(autoSaveTimer)
@@ -258,6 +322,7 @@ watch(() => connStore.activeCollection, async (col) => {
   if (!col || !conn || !db) return
   try {
     const fields = await getFieldPaths(conn, db, col)
+    cachedFields = fields
     updateCompletions(fields)
   } catch { /* ignore */ }
 })

@@ -42,6 +42,7 @@ Ferango is a desktop MongoDB client that lets you write queries in plain **mongo
 ### Editor
 - **mongosh syntax** — write queries like `db.getCollection("users").find({status: "active"})`
 - **Monaco Editor** — VS Code's engine with JavaScript highlighting and IntelliSense
+- **AI autocomplete** — inline ghost text suggestions powered by Ollama, OpenAI, or Claude (see below)
 - **Field autocomplete** — field names from the active collection populate as you type
 - **Snippets** — common patterns (find, aggregate, updateOne…) via autocomplete
 - **Multi-tab** — open multiple scripts at once, auto-saved on tab switch
@@ -77,6 +78,18 @@ Ferango is a desktop MongoDB client that lets you write queries in plain **mongo
 - Sorted by last modified — browse, rename, and delete from the Scripts panel
 - Every executed query is logged automatically per connection
 - Click a history entry to open it in a new tab
+
+### AI Autocomplete
+
+Ferango includes built-in AI-powered code completion — type a comment or start a query and get inline suggestions.
+
+- **Ollama (default)** — runs locally, free, no API key needed. Just install [Ollama](https://ollama.com) and pull a model (`ollama pull qwen2.5-coder:7b`)
+- **OpenAI** — use your own API key with `gpt-4o-mini` or any compatible model
+- **Claude** — use your own API key with `claude-haiku-4-5-20241022` or any Anthropic model
+
+Configure in **Settings > AI Autocomplete**. API keys are stored in your OS keychain, never in config files. All AI requests are proxied through the local Rust backend — your keys never touch the renderer process.
+
+> **Tip:** Write a comment like `// find users where name starts with J` and the AI will suggest the matching query.
 
 ### Appearance
 - **Dark / light theme** — toggle from the toolbar
@@ -123,7 +136,7 @@ Full mongosh syntax support including:
 
 ## Data & privacy
 
-All data is stored locally. Nothing is sent to any server.
+All data is stored locally. Nothing is sent to any server except when AI autocomplete is enabled — in that case, the code context around your cursor is sent to your configured LLM provider (Ollama runs locally by default).
 
 | Path | Contents |
 |---|---|

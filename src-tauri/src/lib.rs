@@ -1,3 +1,4 @@
+mod ai;
 mod mongo;
 mod ssh;
 mod storage;
@@ -48,6 +49,11 @@ pub fn run() {
             storage::save_settings,
             ssh::open_tunnel,
             ssh::close_tunnel,
+            // AI commands
+            ai::ai_complete,
+            ai::ai_check_health,
+            ai::save_ai_api_key,
+            ai::get_ai_api_key_exists,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Ferango");

@@ -190,6 +190,10 @@ export interface AppSettings {
   theme: string
   font_size: number
   last_dbs: Record<string, string>
+  ai_enabled: boolean
+  ai_provider: string
+  ai_endpoint: string
+  ai_model: string
 }
 
 export const loadSettings = (): Promise<AppSettings> =>
@@ -197,3 +201,29 @@ export const loadSettings = (): Promise<AppSettings> =>
 
 export const saveSettings = (settings: AppSettings): Promise<void> =>
   invoke('save_settings', { settings })
+
+// ─── AI ──────────────────────────────────────────────────────────────────────
+
+export interface AiCompletionRequest {
+  prefix: string
+  suffix: string
+  collection?: string
+  db?: string
+  field_names: string[]
+}
+
+export interface AiCompletionResponse {
+  text: string
+}
+
+export const aiComplete = (request: AiCompletionRequest): Promise<AiCompletionResponse> =>
+  invoke('ai_complete', { request })
+
+export const aiCheckHealth = (): Promise<boolean> =>
+  invoke('ai_check_health')
+
+export const saveAiApiKey = (provider: string, key: string): Promise<void> =>
+  invoke('save_ai_api_key', { provider, key })
+
+export const getAiApiKeyExists = (provider: string): Promise<boolean> =>
+  invoke('get_ai_api_key_exists', { provider })

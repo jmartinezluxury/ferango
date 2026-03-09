@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted, provide } from 'vue'
+import { ref, watch, onMounted, provide } from 'vue'
 import { useConnectionsStore } from './stores/connections'
 import { useEditorStore } from './stores/editor'
 import { useSettingsStore } from './stores/settings'
+import { saveAiApiKey, getAiApiKeyExists, aiCheckHealth } from './lib/tauri'
 import ConnectionTree from './components/ConnectionTree.vue'
 import ScriptBrowser from './components/ScriptBrowser.vue'
 import QueryEditor from './components/QueryEditor.vue'
@@ -14,6 +15,43 @@ const settingsStore = useSettingsStore()
 
 // ── Settings modal ────────────────────────────────────────────────────────────
 const settingsOpen = ref(false)
+const aiApiKey = ref('')
+const aiKeyExists = ref(false)
+const aiHealthStatus = ref<'idle' | 'checking' | 'ok' | 'fail'>('idle')
+
+watch(settingsOpen, async (open) => {
+  if (open) {
+    aiApiKey.value = ''
+    aiHealthStatus.value = 'idle'
+    aiKeyExists.value = await getAiApiKeyExists(settingsStore.aiProvider).catch(() => false)
+  }
+})
+
+watch(() => settingsStore.aiProvider, async () => {
+  aiKeyExists.value = await getAiApiKeyExists(settingsStore.aiProvider).catch(() => false)
+  aiApiKey.value = ''
+  aiHealthStatus.value = 'idle'
+})
+
+async function saveApiKey() {
+  if (!aiApiKey.value.trim()) return
+  await saveAiApiKey(settingsStore.aiProvider, aiApiKey.value.trim())
+  aiKeyExists.value = true
+  aiApiKey.value = ''
+  showToast('API key saved securely', 'success')
+}
+
+async function testAiConnection() {
+  aiHealthStatus.value = 'checking'
+  try {
+    const ok = await aiCheckHealth()
+    aiHealthStatus.value = ok ? 'ok' : 'fail'
+    showToast(ok ? 'AI provider is reachable' : 'AI provider unreachable', ok ? 'success' : 'error')
+  } catch {
+    aiHealthStatus.value = 'fail'
+    showToast('Failed to check AI provider', 'error')
+  }
+}
 
 // ── Shortcuts modal ───────────────────────────────────────────────────────────
 const shortcutsOpen = ref(false)
@@ -139,6 +177,78 @@ onMounted(async () => {
           <button class="btn-icon font-btn" :disabled="settingsStore.fontSize >= 24" @click="settingsStore.setFontSize(settingsStore.fontSize + 1)">+</button>
         </div>
       </div>
+
+      <div class="settings-divider" />
+
+      <div class="settings-section">
+        <div class="settings-label">AI Autocomplete</div>
+        <label class="ai-toggle-row">
+          <input type="checkbox" :checked="settingsStore.aiEnabled" @change="settingsStore.setAiEnabled(($event.target as HTMLInputElement).checked)" />
+          <span>{{ settingsStore.aiEnabled ? 'Enabled' : 'Disabled' }}</span>
+        </label>
+      </div>
+
+      <template v-if="settingsStore.aiEnabled">
+        <div class="settings-section">
+          <div class="settings-label">Provider</div>
+          <div class="provider-row">
+            <button
+              v-for="p in (['ollama', 'openai', 'claude'] as const)"
+              :key="p"
+              :class="['theme-btn', { active: settingsStore.aiProvider === p }]"
+              @click="settingsStore.setAiProvider(p)"
+            >{{ p === 'ollama' ? 'Ollama' : p === 'openai' ? 'OpenAI' : 'Claude' }}</button>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-label">Endpoint</div>
+          <input
+            class="settings-input"
+            :value="settingsStore.aiEndpoint"
+            @change="settingsStore.setAiEndpoint(($event.target as HTMLInputElement).value)"
+            placeholder="http://localhost:11434"
+          />
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-label">Model</div>
+          <input
+            class="settings-input"
+            :value="settingsStore.aiModel"
+            @change="settingsStore.setAiModel(($event.target as HTMLInputElement).value)"
+            placeholder="codellama:7b"
+          />
+        </div>
+
+        <div v-if="settingsStore.aiProvider !== 'ollama'" class="settings-section">
+          <div class="settings-label">
+            API Key
+            <span v-if="aiKeyExists" class="key-saved">saved</span>
+          </div>
+          <div class="api-key-row">
+            <input
+              class="settings-input"
+              type="password"
+              v-model="aiApiKey"
+              :placeholder="aiKeyExists ? '••••••••  (update key)' : 'Enter API key'"
+            />
+            <button class="btn-ghost save-key-btn" @click="saveApiKey" :disabled="!aiApiKey.trim()">Save</button>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <button
+            class="btn-ghost test-btn"
+            :disabled="aiHealthStatus === 'checking'"
+            @click="testAiConnection"
+          >
+            {{ aiHealthStatus === 'checking' ? 'Checking…' : 'Test connection' }}
+            <span v-if="aiHealthStatus === 'ok'" class="health-ok">OK</span>
+            <span v-if="aiHealthStatus === 'fail'" class="health-fail">Failed</span>
+          </button>
+        </div>
+      </template>
     </div>
   </div>
 
@@ -237,6 +347,27 @@ onMounted(async () => {
 .font-btn { font-size: 16px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border); }
 .font-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .font-size-val { font-size: 13px; color: var(--text); min-width: 36px; text-align: center; font-family: var(--font-mono); }
+
+/* AI settings */
+.settings-divider { height: 1px; background: var(--border); margin: 16px 0; }
+.ai-toggle-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-dim); cursor: pointer; }
+.ai-toggle-row input[type="checkbox"] { accent-color: var(--accent); width: 14px; height: 14px; }
+.provider-row { display: flex; gap: 6px; }
+.settings-input {
+  width: 100%; padding: 6px 8px; font-size: 12px;
+  background: var(--bg-input); color: var(--text);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  font-family: var(--font-mono);
+}
+.settings-input:focus { border-color: var(--accent); outline: none; }
+.api-key-row { display: flex; gap: 6px; }
+.api-key-row .settings-input { flex: 1; }
+.save-key-btn { font-size: 11px; padding: 5px 10px; white-space: nowrap; }
+.save-key-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.key-saved { color: var(--green); font-size: 10px; font-weight: 600; margin-left: 6px; text-transform: none; letter-spacing: 0; }
+.test-btn { font-size: 11px; display: flex; align-items: center; gap: 6px; }
+.health-ok { color: var(--green); font-weight: 600; }
+.health-fail { color: var(--red); font-weight: 600; }
 
 /* Shortcuts modal */
 .shortcuts-modal { min-width: 380px; }

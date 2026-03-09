@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.0] — 2026-03-09
+
+### Added
+- **AI-powered inline autocomplete** — ghost text suggestions as you type, like GitHub Copilot
+- Multi-provider support: **Ollama** (local, default), **OpenAI**, and **Claude** APIs
+- AI settings panel in Settings modal — toggle on/off, select provider, configure endpoint, model, and API key
+- API keys stored securely in OS keychain (never in config files)
+- Fill-in-the-middle (FIM) support for compatible models (CodeLlama, DeepSeek Coder, StarCoder, Qwen2.5-Coder)
+- Context-aware completions — sends active database, collection, and field names to the LLM
+- Debounced requests (600ms) with automatic cancellation to avoid API spam
+- "Test connection" button to verify AI provider reachability
+- Auto-fill default endpoints and models when switching providers
+
 ## [0.1.1] — 2026-03-07
 
 ### Fixed
@@ -76,5 +89,6 @@ Initial public release.
 - Font size adjustable from 10 to 24px
 - Keyboard shortcuts reference panel
 
+[0.2.0]: https://github.com/jmartinezluxury/ferango/releases/tag/v0.2.0
 [0.1.1]: https://github.com/jmartinezluxury/ferango/releases/tag/v0.1.1
 [0.1.0]: https://github.com/jmartinezluxury/ferango/releases/tag/v0.1.0
