@@ -90,6 +90,10 @@ onMounted(async () => {
   await settingsStore.init()
   await connStore.init()
   await editorStore.init()
+
+  // Disable the default browser context menu globally;
+  // our custom context menus already call preventDefault() themselves.
+  document.addEventListener('contextmenu', (e) => e.preventDefault())
 })
 </script>
 

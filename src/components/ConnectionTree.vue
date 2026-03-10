@@ -411,7 +411,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closeCtxMenu))
         </div>
         <template v-if="expandedGroups.has(String(g))">
           <div v-for="conn in conns" :key="conn.id" class="tree-section" style="padding-left:12px">
-            <div class="tree-node tree-conn" :class="{ active: connStore.activeConn?.id === conn.id }" @click="onToggleConn(conn)">
+            <div class="tree-node tree-conn" :data-conn-id="conn.id" :class="{ active: connStore.activeConn?.id === conn.id }" @click="onToggleConn(conn)">
               <span class="tree-caret">{{ connStore.tree[conn.id]?.expanded ? '▾' : '▸' }}</span>
               <span class="tree-icon">⬡</span>
               <span class="tree-label">{{ conn.name }}</span>
@@ -446,7 +446,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closeCtxMenu))
 
       <!-- Ungrouped connections -->
       <div v-for="conn in groupedConnections.ungrouped" :key="conn.id" class="tree-section">
-        <div class="tree-node tree-conn" :class="{ active: connStore.activeConn?.id === conn.id }" @click="onToggleConn(conn)">
+        <div class="tree-node tree-conn" :data-conn-id="conn.id" :class="{ active: connStore.activeConn?.id === conn.id }" @click="onToggleConn(conn)">
           <span class="tree-caret">{{ connStore.tree[conn.id]?.expanded ? '▾' : '▸' }}</span>
           <span class="tree-icon">⬡</span>
           <span class="tree-label">{{ conn.name }}</span>

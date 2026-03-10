@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, inject, watch } from 'vue'
+import { ref, computed, inject, watch, nextTick } from 'vue'
 import { useEditorStore } from '../stores/editor'
 import { useConnectionsStore } from '../stores/connections'
 import type { ScriptFile, HistoryEntry } from '../lib/tauri'
@@ -36,20 +36,40 @@ async function openScript(script: ScriptFile) {
     // Auto-activate the connection this script belongs to
     const conn = connStore.connections.find(c => c.name === script.folder)
     if (!conn) return
-    if (connStore.activeConn?.id !== conn.id) {
-      const node = connStore.tree[conn.id]
-      if (node?.expanded) {
-        connStore.activeConn = conn
-      } else {
-        await connStore.toggleConnection(conn)
-      }
+
+    // Ensure the connection is expanded (connected and databases fetched)
+    const node = connStore.tree[conn.id]
+    if (!node?.expanded) {
+      await connStore.toggleConnection(conn)
+    } else {
+      connStore.activeConn = conn
     }
-    // Auto-select the last used DB for this connection
+
+    // Determine the DB to activate: last used, or first available
     const lastDb = connStore.lastDbPerConn[conn.id]
     const databases = connStore.tree[conn.id]?.databases ?? []
-    if (lastDb && databases.includes(lastDb) && connStore.activeDb !== lastDb) {
-      await connStore.activateDatabase(conn, lastDb)
+    const targetDb = lastDb && databases.includes(lastDb) ? lastDb : databases[0]
+    if (targetDb && connStore.activeDb !== targetDb) {
+      await connStore.activateDatabase(conn, targetDb)
     }
+
+    // Try to extract collection name from the script content and auto-select it
+    const content = editorStore.activeTab()?.content ?? ''
+    const colMatch = content.match(/db\.getCollection\(["']([^"']+)["']\)/) ??
+                     content.match(/db\.([a-zA-Z_$][\w$]*)\.(?:find|findOne|aggregate|count|insert|update|delete|drop)/)
+    if (colMatch) {
+      const colName = colMatch[1]
+      const dbName = connStore.activeDb
+      const cols = connStore.tree[conn.id]?.expandedDbs[dbName] ?? []
+      if (cols.includes(colName)) {
+        connStore.selectCollection(conn, dbName, colName)
+      }
+    }
+
+    // Scroll the connection tree to make the active connection visible
+    await nextTick()
+    const el = document.querySelector(`[data-conn-id="${conn.id}"]`)
+    el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   } catch (e) { toast(String(e), 'error') }
 }
 

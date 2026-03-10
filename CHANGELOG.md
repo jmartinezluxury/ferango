@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.1] — 2026-03-10
+
+### Fixed
+- **Sort not applied** — `.sort({ field: -1 })` was silently ignored due to a parsing bug that truncated the closing brace of the sort document
+- **Date display** — BSON dates now display as `ISODate("...")` instead of plain strings, making it easy to distinguish Date types from String types
+- **Disable browser context menu** — right-click no longer shows "Reload / Inspect Element" outside of custom context menus
+
+### Added
+- **Script auto-context** — opening a saved script now automatically connects to the cluster, activates the database, and selects the collection parsed from the script content
+- **Scroll to connection** — the connection tree scrolls to the active connection when opening a script
+
+---
+
 ## [0.2.0] — 2026-03-09
 
 ### Added
@@ -89,6 +102,7 @@ Initial public release.
 - Font size adjustable from 10 to 24px
 - Keyboard shortcuts reference panel
 
+[0.2.1]: https://github.com/jmartinezluxury/ferango/releases/tag/v0.2.1
 [0.2.0]: https://github.com/jmartinezluxury/ferango/releases/tag/v0.2.0
 [0.1.1]: https://github.com/jmartinezluxury/ferango/releases/tag/v0.1.1
 [0.1.0]: https://github.com/jmartinezluxury/ferango/releases/tag/v0.1.0

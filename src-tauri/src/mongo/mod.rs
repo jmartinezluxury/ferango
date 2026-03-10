@@ -375,7 +375,7 @@ async fn run_query(db: &mongodb::Database, query: &str) -> Result<Vec<serde_json
         // chain modifiers: .sort({}).limit(n).skip(n)
         use mongodb::options::FindOptions;
         let mut fopts = FindOptions::default();
-        if let Some(ss) = op.find(".sort(") { let r = &op[ss+6..]; if let Ok(e) = find_first_doc_end(r) { if let Ok(d) = parse_doc(r[..e.saturating_sub(1)].trim()) { fopts.sort = Some(d); } } }
+        if let Some(ss) = op.find(".sort(") { let r = &op[ss+6..]; if let Ok(e) = find_first_doc_end(r) { if let Ok(d) = parse_doc(r[..e].trim()) { fopts.sort = Some(d); } } }
         if let Some(ls) = op.find(".limit(") { let r = &op[ls+7..]; let e = r.find(')').unwrap_or(r.len()); if let Ok(n) = r[..e].trim().parse::<i64>() { fopts.limit = Some(n); } }
         if let Some(sk) = op.find(".skip(") { let r = &op[sk+6..]; let e = r.find(')').unwrap_or(r.len()); if let Ok(n) = r[..e].trim().parse::<u64>() { fopts.skip = Some(n); } }
         let find = find.with_options(fopts);
@@ -887,11 +887,11 @@ fn normalize_ejson(val: serde_json::Value) -> serde_json::Value {
                         .and_then(|v| v.as_str())
                         .and_then(|s| s.parse::<i64>().ok())
                     {
-                        return serde_json::Value::String(millis_to_iso(ms));
+                        return serde_json::Value::String(format!("ISODate(\"{}\")", millis_to_iso(ms)));
                     }
                     // {"$date": "iso_string"}
                     if let Some(s) = date_val.as_str() {
-                        return serde_json::Value::String(s.to_string());
+                        return serde_json::Value::String(format!("ISODate(\"{}\")", s));
                     }
                 }
                 if let Some(bin) = map.get("$binary") {
