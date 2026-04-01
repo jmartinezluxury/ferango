@@ -119,12 +119,16 @@ function setActiveTab(tab: 'table' | 'json' | 'tree') {
 }
 
 // ── Tab-specific state (reads from the tab at props.tabIndex, not activeTab) ──
-const tab = computed(() => editorStore.tabs[props.tabIndex])
+// NOTE: We access editorStore.tabs[props.tabIndex] directly in each computed
+// instead of using an intermediate `tab` computed. This is critical because
+// `tabs` is a shallowRef — the tab objects inside keep the same identity after
+// triggerTabsUpdate(). An intermediate computed would return the same object
+// reference, and Vue's Object.is optimization would block dependent re-evaluation.
 
-const results = computed(() => tab.value?.results ?? [])
+const results = computed(() => editorStore.tabs[props.tabIndex]?.results ?? [])
 
 const result = computed(() => {
-  const t = tab.value
+  const t = editorStore.tabs[props.tabIndex]
   if (!t?.results.length) return null
   return t.results[t.activeResultIdx]?.result ?? null
 })
@@ -133,34 +137,34 @@ const rows = computed((): Record<string, unknown>[] => (result.value?.data ?? []
 
 // Tab connection context (for pagination, editing)
 const tabConn = computed(() => {
-  const t = tab.value
+  const t = editorStore.tabs[props.tabIndex]
   if (t?.connId) {
     return connStore.connections.find((c: { id: string }) => c.id === t.connId) ?? connStore.activeConn
   }
   return connStore.activeConn
 })
-const tabDb = computed(() => tab.value?.dbName || connStore.activeDb || '')
-const tabCollection = computed(() => tab.value?.collectionName || connStore.activeCollection || '')
+const tabDb = computed(() => editorStore.tabs[props.tabIndex]?.dbName || connStore.activeDb || '')
+const tabCollection = computed(() => editorStore.tabs[props.tabIndex]?.collectionName || connStore.activeCollection || '')
 
 // Per-tab computed helpers for pagination state
 const stmtActiveIdx = computed({
-  get: () => tab.value?.activeResultIdx ?? 0,
+  get: () => editorStore.tabs[props.tabIndex]?.activeResultIdx ?? 0,
   set: (v: number) => {
-    const t = tab.value
+    const t = editorStore.tabs[props.tabIndex]
     if (t) { t.activeResultIdx = v; editorStore.triggerTabsUpdate() }
   },
 })
 
 const queryLimit = computed({
-  get: () => tab.value?.queryLimit ?? 50,
+  get: () => editorStore.tabs[props.tabIndex]?.queryLimit ?? 50,
   set: (v: number) => {
-    const t = tab.value
+    const t = editorStore.tabs[props.tabIndex]
     if (t) { t.queryLimit = v; editorStore.triggerTabsUpdate() }
   },
 })
 
-const currentPage = computed(() => tab.value?.currentPage ?? 0)
-const canPaginate = computed(() => !!(tab.value?.rawStmt))
+const currentPage = computed(() => editorStore.tabs[props.tabIndex]?.currentPage ?? 0)
+const canPaginate = computed(() => !!(editorStore.tabs[props.tabIndex]?.rawStmt))
 
 // ── Result search/filter ──────────────────────────────────────────────────────
 const resultSearch = ref('')

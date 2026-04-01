@@ -439,13 +439,11 @@ function formatQuery() {
 
 // ── Run query helpers ─────────────────────────────────────────────────────────
 async function executeStatements(stmts: string[]) {
-  // Prefer the tab's stored connection context; fall back to global active
-  const tab = editorStore.tabs[props.tabIndex]
-  const connId = tab?.connId || connStore.activeConn?.id
-  const conn = connId
-    ? connStore.connections.find(c => c.id === connId) ?? connStore.activeConn
-    : connStore.activeConn
-  const db = tab?.dbName || connStore.activeDb
+  // Always use the global active context (what the breadcrumb shows).
+  // The tab's saved context is only for restoring on tab switch, not for execution.
+  // After execution, _saveConnContext persists the current context to the tab.
+  const conn = connStore.activeConn
+  const db = connStore.activeDb
   if (!conn) { toast('Select a connection first', 'error'); return }
   if (!db) { toast('Select a database first', 'error'); return }
   if (!stmts.length) { toast('No valid statement found', 'error'); return }
@@ -454,13 +452,11 @@ async function executeStatements(stmts: string[]) {
   const alive = await connStore.ensureConnected(conn.id)
   if (!alive) { toast('Could not connect to server', 'error'); return }
 
-  // Sync global UI state to this tab's context so breadcrumb/tree match
-  connStore.selectCollection(conn, db, tab?.collectionName || connStore.activeCollection || '')
-
   editorStore.isExecuting = true
   const label = stmts.length === 1 ? 'Executing…' : `Executing ${stmts.length} statements…`
   toast(label, 'info')
 
+  const tab = editorStore.tabs[props.tabIndex]
   const limit = tab?.queryLimit ?? 50
   try {
     const items: StatementResult[] = []
