@@ -72,6 +72,24 @@ pub struct HistoryEntry {
 
 // ─── Settings ────────────────────────────────────────────────────────────────
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ScriptContext {
+    pub conn_id: String,
+    pub db: String,
+    pub collection: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpenTab {
+    pub script_path: String,
+    #[serde(default)]
+    pub conn_id: String,
+    #[serde(default)]
+    pub db_name: String,
+    #[serde(default)]
+    pub collection_name: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
     #[serde(default = "default_theme")]
@@ -88,6 +106,14 @@ pub struct AppSettings {
     pub ai_endpoint: String,
     #[serde(default = "default_ai_model")]
     pub ai_model: String,
+    #[serde(default = "default_result_view")]
+    pub result_view: String,
+    #[serde(default)]
+    pub script_contexts: std::collections::HashMap<String, ScriptContext>,
+    #[serde(default)]
+    pub open_tabs: Vec<OpenTab>,
+    #[serde(default)]
+    pub active_tab_index: i32,
 }
 
 fn default_theme() -> String { "dark".to_string() }
@@ -96,6 +122,7 @@ fn default_ai_enabled() -> bool { true }
 fn default_ai_provider() -> String { "ollama".to_string() }
 fn default_ai_endpoint() -> String { "http://localhost:11434".to_string() }
 fn default_ai_model() -> String { "codellama:7b".to_string() }
+fn default_result_view() -> String { "table".to_string() }
 
 impl Default for AppSettings {
     fn default() -> Self {
@@ -107,6 +134,10 @@ impl Default for AppSettings {
             ai_provider: default_ai_provider(),
             ai_endpoint: default_ai_endpoint(),
             ai_model: default_ai_model(),
+            result_view: default_result_view(),
+            script_contexts: Default::default(),
+            open_tabs: Default::default(),
+            active_tab_index: -1,
         }
     }
 }

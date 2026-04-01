@@ -57,6 +57,9 @@ export const executeQuery = (
 export const disconnect = (connId: string): Promise<void> =>
   invoke('disconnect', { connId })
 
+export const checkConnection = (connId: string): Promise<boolean> =>
+  invoke('check_connection', { connId })
+
 export const createCollection = (conn: ConnectionConfig, dbName: string, collection: string): Promise<void> =>
   invoke('create_collection', { conn, dbName, collection })
 
@@ -186,6 +189,19 @@ export const closeTunnel = (connId: string): Promise<void> =>
 
 // ─── Settings ─────────────────────────────────────────────────────────────────
 
+export interface ScriptContext {
+  conn_id: string
+  db: string
+  collection: string
+}
+
+export interface OpenTab {
+  script_path: string
+  conn_id: string
+  db_name: string
+  collection_name: string
+}
+
 export interface AppSettings {
   theme: string
   font_size: number
@@ -194,6 +210,10 @@ export interface AppSettings {
   ai_provider: string
   ai_endpoint: string
   ai_model: string
+  result_view: string
+  script_contexts: Record<string, ScriptContext>
+  open_tabs: OpenTab[]
+  active_tab_index: number
 }
 
 export const loadSettings = (): Promise<AppSettings> =>

@@ -22,6 +22,7 @@ pub fn run() {
             mongo::list_collections,
             mongo::execute_query,
             mongo::disconnect,
+            mongo::check_connection,
             mongo::create_collection,
             mongo::drop_collection_cmd,
             mongo::drop_database_cmd,

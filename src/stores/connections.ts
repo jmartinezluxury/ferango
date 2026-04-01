@@ -9,6 +9,7 @@ import {
   listCollections,
   testConnection,
   disconnect as disconnectCmd,
+  checkConnection,
 } from '../lib/tauri'
 import { useSettingsStore } from './settings'
 
@@ -119,6 +120,53 @@ export const useConnectionsStore = defineStore('connections', () => {
     }
   }
 
+  // Expand the tree to show conn > dbName, ensuring the nodes are visible
+  // Used when switching tabs to restore the visual tree state
+  async function expandToContext(conn: ConnectionConfig, dbName: string) {
+    // Ensure connection node exists and is expanded
+    if (!tree.value[conn.id]) {
+      tree.value[conn.id] = { connId: conn.id, databases: [], expanded: true, expandedDbs: {} }
+      try {
+        const dbs = await listDatabases(conn)
+        tree.value[conn.id] = { ...tree.value[conn.id], databases: dbs }
+      } catch { /* ignore */ }
+    } else {
+      tree.value[conn.id] = { ...tree.value[conn.id], expanded: true }
+    }
+
+    // Ensure the DB is expanded (collections list loaded and visible)
+    if (!tree.value[conn.id].expandedDbs[dbName]) {
+      try {
+        const cols = await listCollections(conn, dbName)
+        const node = tree.value[conn.id]
+        tree.value[conn.id] = { ...node, expandedDbs: { ...node.expandedDbs, [dbName]: cols } }
+      } catch { /* ignore */ }
+    }
+  }
+
+  async function ensureConnected(connId: string): Promise<boolean> {
+    const conn = connections.value.find(c => c.id === connId)
+    if (!conn) return false
+
+    // Check if existing client is alive
+    const alive = await checkConnection(connId).catch(() => false)
+    if (alive) return true
+
+    // Connection dead or not in pool — reconnect by listing databases
+    // (get_client in Rust will create a fresh client)
+    try {
+      const dbs = await listDatabases(conn)
+      if (tree.value[conn.id]) {
+        tree.value[conn.id] = { ...tree.value[conn.id], databases: dbs, expanded: true }
+      } else {
+        tree.value[conn.id] = { connId: conn.id, databases: dbs, expanded: true, expandedDbs: {} }
+      }
+      return true
+    } catch {
+      return false
+    }
+  }
+
   async function test(conn: ConnectionConfig) {
     return testConnection(conn)
   }
@@ -144,7 +192,9 @@ export const useConnectionsStore = defineStore('connections', () => {
     toggleConnection,
     toggleDatabase,
     selectCollection,
+    expandToContext,
     activateDatabase,
+    ensureConnected,
     test,
     refreshCollections,
   }

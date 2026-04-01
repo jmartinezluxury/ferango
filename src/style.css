@@ -44,7 +44,18 @@
   --text-muted: #8a95a8;
   --accent:     #0a9e96;
   --accent-dim: #077a74;
+  --green:      #1a7f37;
+  --red:        #cf222e;
+  --yellow:     #9a6700;
+  --blue:       #0969da;
   --scrollbar:  #c4ccd8;
+  --json-key:   #0550ae;
+  --json-str:   #0a3069;
+  --json-num:   #953800;
+  --json-bool:  #0969da;
+  --json-oid:   #8250df;
+  --json-date:  #0e6e6e;
+  --json-bin:   #bc4c00;
 }
 
 html, body, #app {

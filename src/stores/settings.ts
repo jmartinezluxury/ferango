@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { loadSettings, saveSettings } from '../lib/tauri'
+import type { ScriptContext, OpenTab } from '../lib/tauri'
 
 export const useSettingsStore = defineStore('settings', () => {
   const theme = ref<'dark' | 'light'>('dark')
@@ -12,6 +13,16 @@ export const useSettingsStore = defineStore('settings', () => {
   const aiProvider = ref<'ollama' | 'openai' | 'claude'>('ollama')
   const aiEndpoint = ref('http://localhost:11434')
   const aiModel = ref('codellama:7b')
+
+  // Result view preference
+  const resultView = ref<'table' | 'json' | 'tree'>('table')
+
+  // Per-script connection context (persisted across sessions)
+  const scriptContexts = ref<Record<string, ScriptContext>>({})
+
+  // Persisted open tabs (restored on app restart)
+  const openTabs = ref<OpenTab[]>([])
+  const activeTabIdx = ref(-1)
 
   function applyTheme(t: string) {
     document.documentElement.setAttribute('data-theme', t)
@@ -30,6 +41,10 @@ export const useSettingsStore = defineStore('settings', () => {
       ai_provider: aiProvider.value,
       ai_endpoint: aiEndpoint.value,
       ai_model: aiModel.value,
+      result_view: resultView.value,
+      script_contexts: scriptContexts.value,
+      open_tabs: openTabs.value,
+      active_tab_index: activeTabIdx.value,
     }
   }
 
@@ -42,6 +57,10 @@ export const useSettingsStore = defineStore('settings', () => {
     aiProvider.value = (s.ai_provider ?? 'ollama') as 'ollama' | 'openai' | 'claude'
     aiEndpoint.value = s.ai_endpoint ?? 'http://localhost:11434'
     aiModel.value = s.ai_model ?? 'codellama:7b'
+    resultView.value = (s.result_view ?? 'table') as 'table' | 'json' | 'tree'
+    scriptContexts.value = s.script_contexts ?? {}
+    openTabs.value = s.open_tabs ?? []
+    activeTabIdx.value = s.active_tab_index ?? -1
     applyTheme(s.theme)
     applyFontSize(s.font_size)
   }
@@ -94,10 +113,29 @@ export const useSettingsStore = defineStore('settings', () => {
     await saveSettings(currentSettings())
   }
 
+  async function setResultView(v: 'table' | 'json' | 'tree') {
+    resultView.value = v
+    await saveSettings(currentSettings())
+  }
+
+  async function saveScriptContext(path: string, connId: string, db: string, collection: string) {
+    scriptContexts.value[path] = { conn_id: connId, db, collection }
+    await saveSettings(currentSettings())
+  }
+
+  async function saveOpenTabs(tabs: OpenTab[], activeIndex: number) {
+    openTabs.value = tabs
+    activeTabIdx.value = activeIndex
+    await saveSettings(currentSettings())
+  }
+
   return {
     theme, fontSize, lastDbs,
     aiEnabled, aiProvider, aiEndpoint, aiModel,
+    resultView, scriptContexts,
+    openTabs, activeTabIdx,
     init, setTheme, setFontSize, saveLastDb,
     setAiEnabled, setAiProvider, setAiEndpoint, setAiModel,
+    setResultView, saveScriptContext, saveOpenTabs,
   }
 })

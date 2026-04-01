@@ -45,16 +45,23 @@ async function openScript(script: ScriptFile) {
       connStore.activeConn = conn
     }
 
-    // Determine the DB to activate: last used, or first available
-    const lastDb = connStore.lastDbPerConn[conn.id]
-    const databases = connStore.tree[conn.id]?.databases ?? []
-    const targetDb = lastDb && databases.includes(lastDb) ? lastDb : databases[0]
-    if (targetDb && connStore.activeDb !== targetDb) {
-      await connStore.activateDatabase(conn, targetDb)
+    // If editorStore.openScript already restored a saved context for this script,
+    // trust it (more specific than the last-used heuristic).
+    const tab = editorStore.activeTab()
+    const hasSavedCtx = !!(tab?.connId && tab.connId === conn.id && tab.dbName)
+
+    // Determine the DB to activate: saved context > last used > first available
+    if (!hasSavedCtx) {
+      const lastDb = connStore.lastDbPerConn[conn.id]
+      const databases = connStore.tree[conn.id]?.databases ?? []
+      const targetDb = lastDb && databases.includes(lastDb) ? lastDb : databases[0]
+      if (targetDb && connStore.activeDb !== targetDb) {
+        await connStore.activateDatabase(conn, targetDb)
+      }
     }
 
     // Try to extract collection name from the script content and auto-select it
-    const content = editorStore.activeTab()?.content ?? ''
+    const content = tab?.content ?? ''
     const colMatch = content.match(/db\.getCollection\(["']([^"']+)["']\)/) ??
                      content.match(/db\.([a-zA-Z_$][\w$]*)\.(?:find|findOne|aggregate|count|insert|update|delete|drop)/)
     if (colMatch) {

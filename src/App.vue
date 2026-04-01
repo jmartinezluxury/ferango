@@ -127,12 +127,40 @@ onMounted(async () => {
       </div>
       <div class="resize-h" @mousedown.prevent="startResizeH" />
       <div class="main-area">
-        <div class="editor-wrap" :style="{ height: editorH + 'px' }">
-          <QueryEditor />
+        <!-- Tab bar -->
+        <div v-if="editorStore.tabs.length > 0" class="tabs-bar">
+          <div class="tabs-list">
+            <div
+              v-for="(tab, i) in editorStore.tabs"
+              :key="tab.script.path"
+              :class="['tab', { active: i === editorStore.activeTabIndex }]"
+              @click="editorStore.switchTab(i)"
+            >
+              <span class="tab-name">{{ tab.script.name }}{{ tab.modified ? ' ●' : '' }}</span>
+              <button class="tab-close" title="Close" @click.stop="editorStore.closeTab(i)">✕</button>
+            </div>
+          </div>
         </div>
-        <div class="resize-v" @mousedown.prevent="startResizeV" />
-        <div class="viewer-wrap">
-          <ResultViewer />
+
+        <!-- Workspace instances: one per tab, kept in DOM via v-show -->
+        <div
+          v-for="(tab, i) in editorStore.tabs"
+          :key="tab.script.path"
+          v-show="i === editorStore.activeTabIndex"
+          class="workspace"
+        >
+          <div class="editor-wrap" :style="{ height: editorH + 'px' }">
+            <QueryEditor :tabIndex="i" />
+          </div>
+          <div class="resize-v" @mousedown.prevent="startResizeV" />
+          <div class="viewer-wrap">
+            <ResultViewer :tabIndex="i" />
+          </div>
+        </div>
+
+        <!-- Empty state when no tabs open -->
+        <div v-if="editorStore.tabs.length === 0" class="workspace-empty">
+          <span>Open a script or select a collection to get started</span>
         </div>
       </div>
     </div>
@@ -271,6 +299,7 @@ onMounted(async () => {
           <tr><td class="shortcut-key">Run all button</td><td>Run all statements in file</td></tr>
           <tr><td class="shortcut-key">Shift+Alt+F</td><td>Format document</td></tr>
           <tr><td class="shortcut-key">Ctrl+S</td><td>Save script</td></tr>
+          <tr><td class="shortcut-key">Ctrl+Shift+S</td><td>Save all scripts</td></tr>
           <tr><td class="shortcut-key">Ctrl+F</td><td>Find in editor</td></tr>
           <tr><td class="shortcut-key">Ctrl+Z</td><td>Undo</td></tr>
           <tr><td class="shortcut-key">Ctrl+Shift+Z</td><td>Redo</td></tr>
@@ -316,6 +345,38 @@ onMounted(async () => {
 }
 .sidebar-divider { height: 1px; background: var(--border); flex-shrink: 0; }
 .main-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+/* Tab bar */
+.tabs-bar {
+  display: flex; align-items: center;
+  background: var(--bg-sidebar); border-bottom: 1px solid var(--border);
+  height: 30px; flex-shrink: 0; overflow-x: auto; overflow-y: hidden;
+}
+.tabs-list { display: flex; height: 100%; }
+.tab {
+  display: flex; align-items: center; gap: 6px;
+  padding: 0 10px; font-size: 11px; cursor: pointer;
+  border-right: 1px solid var(--border); white-space: nowrap;
+  color: var(--text-dim); background: transparent;
+  transition: background 0.1s;
+}
+.tab:hover { background: var(--bg-hover); }
+.tab.active { background: var(--bg); color: var(--text); border-bottom: 2px solid var(--accent); }
+.tab-name { max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+.tab-close {
+  font-size: 10px; background: transparent; color: var(--text-muted);
+  border-radius: 2px; padding: 1px 3px;
+  opacity: 0; transition: opacity 0.1s;
+}
+.tab:hover .tab-close { opacity: 1; }
+.tab-close:hover { background: var(--bg-hover); color: var(--red); }
+
+/* Workspace instances */
+.workspace { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+.workspace-empty {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  color: var(--text-muted); font-size: 12px;
+}
 .editor-wrap { flex-shrink: 0; overflow: hidden; min-height: 80px; }
 .viewer-wrap { flex: 1; overflow: hidden; }
 .status-bar {

@@ -1,3 +1,12 @@
+<script lang="ts">
+// Module-level: shared across ALL QueryEditor instances
+// Prevents duplicate global Monaco provider registrations
+let _globalProvidersRegistered = false
+let _globalCachedFields: string[] = []
+let _globalFieldDisposable: import('monaco-editor').IDisposable | null = null
+let _globalCollectionDisposable: import('monaco-editor').IDisposable | null = null
+</script>
+
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch, inject } from 'vue'
 import * as monaco from 'monaco-editor'
@@ -5,7 +14,9 @@ import { useEditorStore } from '../stores/editor'
 import type { StatementResult } from '../stores/editor'
 import { useConnectionsStore } from '../stores/connections'
 import { useSettingsStore } from '../stores/settings'
-import { executeQuery, getFieldPaths, logQuery, aiComplete } from '../lib/tauri'
+import { executeQuery, getFieldPaths, listCollections, logQuery, aiComplete } from '../lib/tauri'
+
+const props = defineProps<{ tabIndex: number }>()
 
 const editorStore = useEditorStore()
 const connStore = useConnectionsStore()
@@ -15,16 +26,13 @@ const toast = inject<(msg: string, type?: 'success' | 'error' | 'info') => void>
 const containerEl = ref<HTMLDivElement | null>(null)
 let monacoEditor: monaco.editor.IStandaloneCodeEditor | null = null
 let autoSaveTimer: ReturnType<typeof setTimeout> | null = null
-let completionDisposable: monaco.IDisposable | null = null
-let inlineDisposable: monaco.IDisposable | null = null
-let cachedFields: string[] = []
 
 // ── Monaco setup ──────────────────────────────────────────────────────────────
 onMounted(() => {
   if (!containerEl.value) return
 
   monacoEditor = monaco.editor.create(containerEl.value, {
-    value: '// Select a collection from the tree or open a script\n',
+    value: editorStore.tabs[props.tabIndex]?.content ?? '// Select a collection from the tree or open a script\n',
     language: 'javascript',
     theme: 'vs-dark',
     fontSize: settingsStore.fontSize,
@@ -41,240 +49,244 @@ onMounted(() => {
     scrollbar: { vertical: 'auto', horizontal: 'auto', verticalScrollbarSize: 6, horizontalScrollbarSize: 6 },
   })
 
-  // Register query snippets
-  monaco.languages.registerCompletionItemProvider('javascript', {
-    provideCompletionItems(model, position) {
-      const word = model.getWordUntilPosition(position)
-      const range = {
-        startLineNumber: position.lineNumber, endLineNumber: position.lineNumber,
-        startColumn: word.startColumn, endColumn: word.endColumn,
-      }
-      const snippets = [
-        { label: 'find',           doc: 'Find documents',          text: 'db.getCollection("${1:collection}").find({\n\t${2:field}: ${3:value}\n})' },
-        { label: 'findOne',        doc: 'Find one document',       text: 'db.getCollection("${1:collection}").findOne({\n\t${2:field}: ${3:value}\n})' },
-        { label: 'aggregate',      doc: 'Aggregation pipeline',    text: 'db.getCollection("${1:collection}").aggregate([\n\t{ \\$match: { ${2:field}: ${3:value} } },\n\t{ \\$limit: 20 }\n])' },
-        { label: 'updateOne',      doc: 'Update one document',     text: 'db.getCollection("${1:collection}").updateOne(\n\t{ ${2:filter} },\n\t{ \\$set: { ${3:field}: ${4:value} } }\n)' },
-        { label: 'updateMany',     doc: 'Update many documents',   text: 'db.getCollection("${1:collection}").updateMany(\n\t{ ${2:filter} },\n\t{ \\$set: { ${3:field}: ${4:value} } }\n)' },
-        { label: 'insertOne',      doc: 'Insert one document',     text: 'db.getCollection("${1:collection}").insertOne({\n\t${2:field}: ${3:value}\n})' },
-        { label: 'insertMany',     doc: 'Insert many documents',   text: 'db.getCollection("${1:collection}").insertMany([\n\t{ ${2:field}: ${3:value} }\n])' },
-        { label: 'deleteOne',      doc: 'Delete one document',     text: 'db.getCollection("${1:collection}").deleteOne({\n\t${2:filter}\n})' },
-        { label: 'countDocuments', doc: 'Count documents',         text: 'db.getCollection("${1:collection}").countDocuments({\n\t${2:filter}\n})' },
-      ]
-      return {
-        suggestions: snippets.map(s => ({
-          label: s.label,
-          kind: monaco.languages.CompletionItemKind.Snippet,
-          documentation: s.doc,
-          insertText: s.text,
-          insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          range,
-        })),
-      }
-    },
-  })
+  // ── Global providers (registered only once across all instances) ──────────
+  if (!_globalProvidersRegistered) {
+    _globalProvidersRegistered = true
 
-  // Register MongoDB operator completions (triggered by '$')
-  monaco.languages.registerCompletionItemProvider('javascript', {
-    triggerCharacters: ['$'],
-    provideCompletionItems(model, position) {
-      // Determine the range to replace: from the '$' to the current cursor
-      const lineContent = model.getLineContent(position.lineNumber)
-      let startCol = position.column
-      // Walk back to find the '$' that triggered this
-      while (startCol > 1 && lineContent[startCol - 2] !== '$') startCol--
-      if (startCol > 1 && lineContent[startCol - 2] === '$') startCol-- // include the '$'
-      const range = {
-        startLineNumber: position.lineNumber, endLineNumber: position.lineNumber,
-        startColumn: startCol, endColumn: position.column,
-      }
+    // Register query snippets
+    monaco.languages.registerCompletionItemProvider('javascript', {
+      provideCompletionItems(model, position) {
+        const word = model.getWordUntilPosition(position)
+        const range = {
+          startLineNumber: position.lineNumber, endLineNumber: position.lineNumber,
+          startColumn: word.startColumn, endColumn: word.endColumn,
+        }
+        const snippets = [
+          { label: 'find',           doc: 'Find documents',          text: 'db.getCollection("${1:collection}").find({\n\t${2:field}: ${3:value}\n})' },
+          { label: 'findOne',        doc: 'Find one document',       text: 'db.getCollection("${1:collection}").findOne({\n\t${2:field}: ${3:value}\n})' },
+          { label: 'aggregate',      doc: 'Aggregation pipeline',    text: 'db.getCollection("${1:collection}").aggregate([\n\t{ \\$match: { ${2:field}: ${3:value} } },\n\t{ \\$limit: 20 }\n])' },
+          { label: 'updateOne',      doc: 'Update one document',     text: 'db.getCollection("${1:collection}").updateOne(\n\t{ ${2:filter} },\n\t{ \\$set: { ${3:field}: ${4:value} } }\n)' },
+          { label: 'updateMany',     doc: 'Update many documents',   text: 'db.getCollection("${1:collection}").updateMany(\n\t{ ${2:filter} },\n\t{ \\$set: { ${3:field}: ${4:value} } }\n)' },
+          { label: 'insertOne',      doc: 'Insert one document',     text: 'db.getCollection("${1:collection}").insertOne({\n\t${2:field}: ${3:value}\n})' },
+          { label: 'insertMany',     doc: 'Insert many documents',   text: 'db.getCollection("${1:collection}").insertMany([\n\t{ ${2:field}: ${3:value} }\n])' },
+          { label: 'deleteOne',      doc: 'Delete one document',     text: 'db.getCollection("${1:collection}").deleteOne({\n\t${2:filter}\n})' },
+          { label: 'countDocuments', doc: 'Count documents',         text: 'db.getCollection("${1:collection}").countDocuments({\n\t${2:filter}\n})' },
+        ]
+        return {
+          suggestions: snippets.map(s => ({
+            label: s.label,
+            kind: monaco.languages.CompletionItemKind.Snippet,
+            documentation: s.doc,
+            insertText: s.text,
+            insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+            range,
+          })),
+        }
+      },
+    })
 
-      const operators: { label: string; doc: string; text: string; kind: monaco.languages.CompletionItemKind }[] = [
-        // ── Comparison ──
-        { label: '$eq',  doc: 'Matches values equal to a specified value', text: '\\$eq: ${1:value}', kind: monaco.languages.CompletionItemKind.Operator },
-        { label: '$ne',  doc: 'Matches values not equal to a specified value', text: '\\$ne: ${1:value}', kind: monaco.languages.CompletionItemKind.Operator },
-        { label: '$gt',  doc: 'Matches values greater than a specified value', text: '\\$gt: ${1:value}', kind: monaco.languages.CompletionItemKind.Operator },
-        { label: '$gte', doc: 'Matches values greater than or equal to a specified value', text: '\\$gte: ${1:value}', kind: monaco.languages.CompletionItemKind.Operator },
-        { label: '$lt',  doc: 'Matches values less than a specified value', text: '\\$lt: ${1:value}', kind: monaco.languages.CompletionItemKind.Operator },
-        { label: '$lte', doc: 'Matches values less than or equal to a specified value', text: '\\$lte: ${1:value}', kind: monaco.languages.CompletionItemKind.Operator },
-        { label: '$in',  doc: 'Matches any of the values specified in an array', text: '\\$in: [${1}]', kind: monaco.languages.CompletionItemKind.Operator },
-        { label: '$nin', doc: 'Matches none of the values specified in an array', text: '\\$nin: [${1}]', kind: monaco.languages.CompletionItemKind.Operator },
-        // ── Logical ──
-        { label: '$and', doc: 'Joins query clauses with a logical AND', text: '\\$and: [{ ${1} }, { ${2} }]', kind: monaco.languages.CompletionItemKind.Operator },
-        { label: '$or',  doc: 'Joins query clauses with a logical OR', text: '\\$or: [{ ${1} }, { ${2} }]', kind: monaco.languages.CompletionItemKind.Operator },
-        { label: '$not', doc: 'Inverts the effect of a query expression', text: '\\$not: { ${1} }', kind: monaco.languages.CompletionItemKind.Operator },
-        { label: '$nor', doc: 'Joins query clauses with a logical NOR', text: '\\$nor: [{ ${1} }, { ${2} }]', kind: monaco.languages.CompletionItemKind.Operator },
-        // ── Element ──
-        { label: '$exists', doc: 'Matches documents that have the specified field', text: '\\$exists: ${1:true}', kind: monaco.languages.CompletionItemKind.Operator },
-        { label: '$type',   doc: 'Selects documents if a field is of the specified type', text: '\\$type: "${1:string}"', kind: monaco.languages.CompletionItemKind.Operator },
-        // ── Array ──
-        { label: '$all',       doc: 'Matches arrays that contain all specified elements', text: '\\$all: [${1}]', kind: monaco.languages.CompletionItemKind.Operator },
-        { label: '$elemMatch', doc: 'Matches documents that contain an array element matching all conditions', text: '\\$elemMatch: { ${1} }', kind: monaco.languages.CompletionItemKind.Operator },
-        { label: '$size',      doc: 'Matches arrays with the specified number of elements', text: '\\$size: ${1:1}', kind: monaco.languages.CompletionItemKind.Operator },
-        // ── Evaluation ──
-        { label: '$regex',  doc: 'Selects documents matching a regular expression', text: '\\$regex: /${1:pattern}/${2:flags}', kind: monaco.languages.CompletionItemKind.Operator },
-        { label: '$expr',   doc: 'Use aggregation expressions within the query language', text: '\\$expr: { ${1} }', kind: monaco.languages.CompletionItemKind.Operator },
-        // ── Update ──
-        { label: '$set',      doc: 'Sets the value of a field', text: '\\$set: { ${1:field}: ${2:value} }', kind: monaco.languages.CompletionItemKind.Function },
-        { label: '$unset',    doc: 'Removes the specified field from a document', text: '\\$unset: { ${1:field}: "" }', kind: monaco.languages.CompletionItemKind.Function },
-        { label: '$inc',      doc: 'Increments the value of a field by a specified amount', text: '\\$inc: { ${1:field}: ${2:1} }', kind: monaco.languages.CompletionItemKind.Function },
-        { label: '$push',     doc: 'Adds an element to an array', text: '\\$push: { ${1:field}: ${2:value} }', kind: monaco.languages.CompletionItemKind.Function },
-        { label: '$pull',     doc: 'Removes all elements from an array that match a condition', text: '\\$pull: { ${1:field}: ${2:value} }', kind: monaco.languages.CompletionItemKind.Function },
-        { label: '$addToSet', doc: 'Adds a value to an array only if it doesn\'t already exist', text: '\\$addToSet: { ${1:field}: ${2:value} }', kind: monaco.languages.CompletionItemKind.Function },
-        { label: '$rename',   doc: 'Renames a field', text: '\\$rename: { "${1:oldName}": "${2:newName}" }', kind: monaco.languages.CompletionItemKind.Function },
-        { label: '$min',      doc: 'Updates the field if the specified value is less than the existing value', text: '\\$min: { ${1:field}: ${2:value} }', kind: monaco.languages.CompletionItemKind.Function },
-        { label: '$max',      doc: 'Updates the field if the specified value is greater than the existing value', text: '\\$max: { ${1:field}: ${2:value} }', kind: monaco.languages.CompletionItemKind.Function },
-        { label: '$mul',      doc: 'Multiplies the value of a field by a specified amount', text: '\\$mul: { ${1:field}: ${2:value} }', kind: monaco.languages.CompletionItemKind.Function },
-        // ── Aggregation stages ──
-        { label: '$match',   doc: 'Filters documents to pass only matching documents to the next stage', text: '\\$match: { ${1} }', kind: monaco.languages.CompletionItemKind.Module },
-        { label: '$group',   doc: 'Groups documents by a specified expression', text: '\\$group: { _id: ${1:null}, ${2:field}: { \\$sum: ${3:1} } }', kind: monaco.languages.CompletionItemKind.Module },
-        { label: '$project', doc: 'Reshapes documents by including, excluding, or adding fields', text: '\\$project: { ${1:field}: 1 }', kind: monaco.languages.CompletionItemKind.Module },
-        { label: '$sort',    doc: 'Sorts all documents', text: '\\$sort: { ${1:field}: ${2:-1} }', kind: monaco.languages.CompletionItemKind.Module },
-        { label: '$limit',   doc: 'Limits the number of documents passed to the next stage', text: '\\$limit: ${1:20}', kind: monaco.languages.CompletionItemKind.Module },
-        { label: '$skip',    doc: 'Skips over the specified number of documents', text: '\\$skip: ${1:0}', kind: monaco.languages.CompletionItemKind.Module },
-        { label: '$lookup',  doc: 'Performs a left outer join to another collection', text: '\\$lookup: {\n\tfrom: "${1:collection}",\n\tlocalField: "${2:field}",\n\tforeignField: "${3:_id}",\n\tas: "${4:result}"\n}', kind: monaco.languages.CompletionItemKind.Module },
-        { label: '$unwind',  doc: 'Deconstructs an array field into a document per element', text: '\\$unwind: "\\$${1:field}"', kind: monaco.languages.CompletionItemKind.Module },
-        { label: '$count',   doc: 'Returns a count of the documents at this stage', text: '\\$count: "${1:total}"', kind: monaco.languages.CompletionItemKind.Module },
-        { label: '$out',     doc: 'Writes the result of the pipeline to a collection', text: '\\$out: "${1:collection}"', kind: monaco.languages.CompletionItemKind.Module },
-        { label: '$merge',   doc: 'Merges the result of the pipeline into a collection', text: '\\$merge: { into: "${1:collection}" }', kind: monaco.languages.CompletionItemKind.Module },
-        { label: '$bucket',  doc: 'Categorizes documents into groups (buckets)', text: '\\$bucket: {\n\tgroupBy: "\\$${1:field}",\n\tboundaries: [${2:0, 100, 200}],\n\tdefault: "Other"\n}', kind: monaco.languages.CompletionItemKind.Module },
-        { label: '$facet',   doc: 'Process multiple aggregation pipelines in a single stage', text: '\\$facet: {\n\t${1:output}: [{ ${2} }]\n}', kind: monaco.languages.CompletionItemKind.Module },
-        { label: '$replaceRoot', doc: 'Replaces the document with the specified embedded document', text: '\\$replaceRoot: { newRoot: "\\$${1:field}" }', kind: monaco.languages.CompletionItemKind.Module },
-        // ── Accumulators (inside $group) ──
-        { label: '$sum',   doc: 'Calculates the sum', text: '\\$sum: ${1:1}', kind: monaco.languages.CompletionItemKind.Operator },
-        { label: '$avg',   doc: 'Calculates the average', text: '\\$avg: "\\$${1:field}"', kind: monaco.languages.CompletionItemKind.Operator },
-        { label: '$first', doc: 'Returns the first value in a group', text: '\\$first: "\\$${1:field}"', kind: monaco.languages.CompletionItemKind.Operator },
-        { label: '$last',  doc: 'Returns the last value in a group', text: '\\$last: "\\$${1:field}"', kind: monaco.languages.CompletionItemKind.Operator },
-      ]
-      return {
-        suggestions: operators.map((op, i) => ({
-          label: op.label,
-          filterText: op.label.slice(1), // match without '$' so typing 'so' matches '$sort'
-          kind: op.kind,
-          documentation: op.doc,
-          insertText: op.text,
-          insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          range,
-          sortText: String(i).padStart(3, '0'),
-        })),
-      }
-    },
-  })
+    // Register MongoDB operator completions (triggered by '$')
+    monaco.languages.registerCompletionItemProvider('javascript', {
+      triggerCharacters: ['$'],
+      provideCompletionItems(model, position) {
+        const lineContent = model.getLineContent(position.lineNumber)
+        let startCol = position.column
+        while (startCol > 1 && lineContent[startCol - 2] !== '$') startCol--
+        if (startCol > 1 && lineContent[startCol - 2] === '$') startCol--
+        const range = {
+          startLineNumber: position.lineNumber, endLineNumber: position.lineNumber,
+          startColumn: startCol, endColumn: position.column,
+        }
 
-  // Register chained method completions (.sort, .limit, .skip after find/aggregate)
-  monaco.languages.registerCompletionItemProvider('javascript', {
-    triggerCharacters: ['.'],
-    provideCompletionItems(model, position) {
-      const textBefore = model.getValueInRange({
-        startLineNumber: 1, startColumn: 1,
-        endLineNumber: position.lineNumber, endColumn: position.column,
-      })
-      // Only suggest after a query chain (find, aggregate, sort, limit, skip)
-      if (!/\.\s*(find|findOne|aggregate|sort|limit|skip)\s*\(/.test(textBefore)) return { suggestions: [] }
+        const operators: { label: string; doc: string; text: string; kind: monaco.languages.CompletionItemKind }[] = [
+          // ── Comparison ──
+          { label: '$eq',  doc: 'Matches values equal to a specified value', text: '\\$eq: ${1:value}', kind: monaco.languages.CompletionItemKind.Operator },
+          { label: '$ne',  doc: 'Matches values not equal to a specified value', text: '\\$ne: ${1:value}', kind: monaco.languages.CompletionItemKind.Operator },
+          { label: '$gt',  doc: 'Matches values greater than a specified value', text: '\\$gt: ${1:value}', kind: monaco.languages.CompletionItemKind.Operator },
+          { label: '$gte', doc: 'Matches values greater than or equal to a specified value', text: '\\$gte: ${1:value}', kind: monaco.languages.CompletionItemKind.Operator },
+          { label: '$lt',  doc: 'Matches values less than a specified value', text: '\\$lt: ${1:value}', kind: monaco.languages.CompletionItemKind.Operator },
+          { label: '$lte', doc: 'Matches values less than or equal to a specified value', text: '\\$lte: ${1:value}', kind: monaco.languages.CompletionItemKind.Operator },
+          { label: '$in',  doc: 'Matches any of the values specified in an array', text: '\\$in: [${1}]', kind: monaco.languages.CompletionItemKind.Operator },
+          { label: '$nin', doc: 'Matches none of the values specified in an array', text: '\\$nin: [${1}]', kind: monaco.languages.CompletionItemKind.Operator },
+          // ── Logical ──
+          { label: '$and', doc: 'Joins query clauses with a logical AND', text: '\\$and: [{ ${1} }, { ${2} }]', kind: monaco.languages.CompletionItemKind.Operator },
+          { label: '$or',  doc: 'Joins query clauses with a logical OR', text: '\\$or: [{ ${1} }, { ${2} }]', kind: monaco.languages.CompletionItemKind.Operator },
+          { label: '$not', doc: 'Inverts the effect of a query expression', text: '\\$not: { ${1} }', kind: monaco.languages.CompletionItemKind.Operator },
+          { label: '$nor', doc: 'Joins query clauses with a logical NOR', text: '\\$nor: [{ ${1} }, { ${2} }]', kind: monaco.languages.CompletionItemKind.Operator },
+          // ── Element ──
+          { label: '$exists', doc: 'Matches documents that have the specified field', text: '\\$exists: ${1:true}', kind: monaco.languages.CompletionItemKind.Operator },
+          { label: '$type',   doc: 'Selects documents if a field is of the specified type', text: '\\$type: "${1:string}"', kind: monaco.languages.CompletionItemKind.Operator },
+          // ── Array ──
+          { label: '$all',       doc: 'Matches arrays that contain all specified elements', text: '\\$all: [${1}]', kind: monaco.languages.CompletionItemKind.Operator },
+          { label: '$elemMatch', doc: 'Matches documents that contain an array element matching all conditions', text: '\\$elemMatch: { ${1} }', kind: monaco.languages.CompletionItemKind.Operator },
+          { label: '$size',      doc: 'Matches arrays with the specified number of elements', text: '\\$size: ${1:1}', kind: monaco.languages.CompletionItemKind.Operator },
+          // ── Evaluation ──
+          { label: '$regex',  doc: 'Selects documents matching a regular expression', text: '\\$regex: /${1:pattern}/${2:flags}', kind: monaco.languages.CompletionItemKind.Operator },
+          { label: '$expr',   doc: 'Use aggregation expressions within the query language', text: '\\$expr: { ${1} }', kind: monaco.languages.CompletionItemKind.Operator },
+          // ── Update ──
+          { label: '$set',      doc: 'Sets the value of a field', text: '\\$set: { ${1:field}: ${2:value} }', kind: monaco.languages.CompletionItemKind.Function },
+          { label: '$unset',    doc: 'Removes the specified field from a document', text: '\\$unset: { ${1:field}: "" }', kind: monaco.languages.CompletionItemKind.Function },
+          { label: '$inc',      doc: 'Increments the value of a field by a specified amount', text: '\\$inc: { ${1:field}: ${2:1} }', kind: monaco.languages.CompletionItemKind.Function },
+          { label: '$push',     doc: 'Adds an element to an array', text: '\\$push: { ${1:field}: ${2:value} }', kind: monaco.languages.CompletionItemKind.Function },
+          { label: '$pull',     doc: 'Removes all elements from an array that match a condition', text: '\\$pull: { ${1:field}: ${2:value} }', kind: monaco.languages.CompletionItemKind.Function },
+          { label: '$addToSet', doc: 'Adds a value to an array only if it doesn\'t already exist', text: '\\$addToSet: { ${1:field}: ${2:value} }', kind: monaco.languages.CompletionItemKind.Function },
+          { label: '$rename',   doc: 'Renames a field', text: '\\$rename: { "${1:oldName}": "${2:newName}" }', kind: monaco.languages.CompletionItemKind.Function },
+          { label: '$min',      doc: 'Updates the field if the specified value is less than the existing value', text: '\\$min: { ${1:field}: ${2:value} }', kind: monaco.languages.CompletionItemKind.Function },
+          { label: '$max',      doc: 'Updates the field if the specified value is greater than the existing value', text: '\\$max: { ${1:field}: ${2:value} }', kind: monaco.languages.CompletionItemKind.Function },
+          { label: '$mul',      doc: 'Multiplies the value of a field by a specified amount', text: '\\$mul: { ${1:field}: ${2:value} }', kind: monaco.languages.CompletionItemKind.Function },
+          // ── Aggregation stages ──
+          { label: '$match',   doc: 'Filters documents to pass only matching documents to the next stage', text: '\\$match: { ${1} }', kind: monaco.languages.CompletionItemKind.Module },
+          { label: '$group',   doc: 'Groups documents by a specified expression', text: '\\$group: { _id: ${1:null}, ${2:field}: { \\$sum: ${3:1} } }', kind: monaco.languages.CompletionItemKind.Module },
+          { label: '$project', doc: 'Reshapes documents by including, excluding, or adding fields', text: '\\$project: { ${1:field}: 1 }', kind: monaco.languages.CompletionItemKind.Module },
+          { label: '$sort',    doc: 'Sorts all documents', text: '\\$sort: { ${1:field}: ${2:-1} }', kind: monaco.languages.CompletionItemKind.Module },
+          { label: '$limit',   doc: 'Limits the number of documents passed to the next stage', text: '\\$limit: ${1:20}', kind: monaco.languages.CompletionItemKind.Module },
+          { label: '$skip',    doc: 'Skips over the specified number of documents', text: '\\$skip: ${1:0}', kind: monaco.languages.CompletionItemKind.Module },
+          { label: '$lookup',  doc: 'Performs a left outer join to another collection', text: '\\$lookup: {\n\tfrom: "${1:collection}",\n\tlocalField: "${2:field}",\n\tforeignField: "${3:_id}",\n\tas: "${4:result}"\n}', kind: monaco.languages.CompletionItemKind.Module },
+          { label: '$unwind',  doc: 'Deconstructs an array field into a document per element', text: '\\$unwind: "\\$${1:field}"', kind: monaco.languages.CompletionItemKind.Module },
+          { label: '$count',   doc: 'Returns a count of the documents at this stage', text: '\\$count: "${1:total}"', kind: monaco.languages.CompletionItemKind.Module },
+          { label: '$out',     doc: 'Writes the result of the pipeline to a collection', text: '\\$out: "${1:collection}"', kind: monaco.languages.CompletionItemKind.Module },
+          { label: '$merge',   doc: 'Merges the result of the pipeline into a collection', text: '\\$merge: { into: "${1:collection}" }', kind: monaco.languages.CompletionItemKind.Module },
+          { label: '$bucket',  doc: 'Categorizes documents into groups (buckets)', text: '\\$bucket: {\n\tgroupBy: "\\$${1:field}",\n\tboundaries: [${2:0, 100, 200}],\n\tdefault: "Other"\n}', kind: monaco.languages.CompletionItemKind.Module },
+          { label: '$facet',   doc: 'Process multiple aggregation pipelines in a single stage', text: '\\$facet: {\n\t${1:output}: [{ ${2} }]\n}', kind: monaco.languages.CompletionItemKind.Module },
+          { label: '$replaceRoot', doc: 'Replaces the document with the specified embedded document', text: '\\$replaceRoot: { newRoot: "\\$${1:field}" }', kind: monaco.languages.CompletionItemKind.Module },
+          // ── Accumulators (inside $group) ──
+          { label: '$sum',   doc: 'Calculates the sum', text: '\\$sum: ${1:1}', kind: monaco.languages.CompletionItemKind.Operator },
+          { label: '$avg',   doc: 'Calculates the average', text: '\\$avg: "\\$${1:field}"', kind: monaco.languages.CompletionItemKind.Operator },
+          { label: '$first', doc: 'Returns the first value in a group', text: '\\$first: "\\$${1:field}"', kind: monaco.languages.CompletionItemKind.Operator },
+          { label: '$last',  doc: 'Returns the last value in a group', text: '\\$last: "\\$${1:field}"', kind: monaco.languages.CompletionItemKind.Operator },
+        ]
+        return {
+          suggestions: operators.map((op, i) => ({
+            label: op.label,
+            filterText: op.label.slice(1),
+            kind: op.kind,
+            documentation: op.doc,
+            insertText: op.text,
+            insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+            range,
+            sortText: String(i).padStart(3, '0'),
+          })),
+        }
+      },
+    })
 
-      const word = model.getWordUntilPosition(position)
-      const range = {
-        startLineNumber: position.lineNumber, endLineNumber: position.lineNumber,
-        startColumn: word.startColumn, endColumn: word.endColumn,
-      }
-      const methods = [
-        { label: 'sort',  doc: 'Sort results by field(s)', text: 'sort({ ${1:field}: ${2:-1} })' },
-        { label: 'limit', doc: 'Limit the number of results', text: 'limit(${1:20})' },
-        { label: 'skip',  doc: 'Skip a number of results', text: 'skip(${1:0})' },
-      ]
-      return {
-        suggestions: methods.map(m => ({
-          label: m.label,
-          kind: monaco.languages.CompletionItemKind.Method,
-          documentation: m.doc,
-          insertText: m.text,
-          insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          range,
-        })),
-      }
-    },
-  })
+    // Register chained method completions (.sort, .limit, .skip after find/aggregate)
+    monaco.languages.registerCompletionItemProvider('javascript', {
+      triggerCharacters: ['.'],
+      provideCompletionItems(model, position) {
+        const textBefore = model.getValueInRange({
+          startLineNumber: 1, startColumn: 1,
+          endLineNumber: position.lineNumber, endColumn: position.column,
+        })
+        if (!/\.\s*(find|findOne|aggregate|sort|limit|skip)\s*\(/.test(textBefore)) return { suggestions: [] }
 
-  // ── AI Inline Completions ────────────────────────────────────────────────────
-  inlineDisposable = monaco.languages.registerInlineCompletionsProvider('javascript', {
-    provideInlineCompletions: async (model, position, _context, token) => {
-      if (!settingsStore.aiEnabled) return { items: [] }
+        const word = model.getWordUntilPosition(position)
+        const range = {
+          startLineNumber: position.lineNumber, endLineNumber: position.lineNumber,
+          startColumn: word.startColumn, endColumn: word.endColumn,
+        }
+        const methods = [
+          { label: 'sort',  doc: 'Sort results by field(s)', text: 'sort({ ${1:field}: ${2:-1} })' },
+          { label: 'limit', doc: 'Limit the number of results', text: 'limit(${1:20})' },
+          { label: 'skip',  doc: 'Skip a number of results', text: 'skip(${1:0})' },
+        ]
+        return {
+          suggestions: methods.map(m => ({
+            label: m.label,
+            kind: monaco.languages.CompletionItemKind.Method,
+            documentation: m.doc,
+            insertText: m.text,
+            insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+            range,
+          })),
+        }
+      },
+    })
 
-      // Get text before and after cursor
-      const prefix = model.getValueInRange({
-        startLineNumber: 1, startColumn: 1,
-        endLineNumber: position.lineNumber, endColumn: position.column,
-      })
-      const totalLines = model.getLineCount()
-      const suffix = model.getValueInRange({
-        startLineNumber: position.lineNumber, startColumn: position.column,
-        endLineNumber: totalLines, endColumn: model.getLineMaxColumn(totalLines),
-      })
+    // Register collection name completions (inside getCollection("...") or db.xxx)
+    // This is a static registration; the actual collection list is updated dynamically
+    // via _globalCollectionDisposable (see updateCollectionCompletions below).
 
-      // Skip if prefix is too short
-      if (prefix.trim().length < 3) return { items: [] }
+    // ── AI Inline Completions ──────────────────────────────────────────────────
+    monaco.languages.registerInlineCompletionsProvider('javascript', {
+      provideInlineCompletions: async (model, position, _context, token) => {
+        if (!settingsStore.aiEnabled) return { items: [] }
 
-      // Debounce: wait 600ms, bail if cancelled
-      const cancelled = await new Promise<boolean>((resolve) => {
-        const timer = setTimeout(() => resolve(false), 600)
-        token.onCancellationRequested(() => { clearTimeout(timer); resolve(true) })
-      })
-      if (cancelled || token.isCancellationRequested) return { items: [] }
-
-      // Limit context window
-      const prefixLines = prefix.split('\n')
-      const trimmedPrefix = prefixLines.slice(-50).join('\n')
-      const suffixLines = suffix.split('\n')
-      const trimmedSuffix = suffixLines.slice(0, 10).join('\n')
-
-      try {
-        const resp = await aiComplete({
-          prefix: trimmedPrefix,
-          suffix: trimmedSuffix,
-          collection: connStore.activeCollection || undefined,
-          db: connStore.activeDb || undefined,
-          field_names: cachedFields,
+        const prefix = model.getValueInRange({
+          startLineNumber: 1, startColumn: 1,
+          endLineNumber: position.lineNumber, endColumn: position.column,
+        })
+        const totalLines = model.getLineCount()
+        const suffix = model.getValueInRange({
+          startLineNumber: position.lineNumber, startColumn: position.column,
+          endLineNumber: totalLines, endColumn: model.getLineMaxColumn(totalLines),
         })
 
-        if (token.isCancellationRequested || !resp.text) return { items: [] }
+        if (prefix.trim().length < 3) return { items: [] }
 
-        return {
-          items: [{
-            insertText: resp.text,
-            range: {
-              startLineNumber: position.lineNumber,
-              startColumn: position.column,
-              endLineNumber: position.lineNumber,
-              endColumn: position.column,
-            },
-          }],
+        const cancelled = await new Promise<boolean>((resolve) => {
+          const timer = setTimeout(() => resolve(false), 600)
+          token.onCancellationRequested(() => { clearTimeout(timer); resolve(true) })
+        })
+        if (cancelled || token.isCancellationRequested) return { items: [] }
+
+        const prefixLines = prefix.split('\n')
+        const trimmedPrefix = prefixLines.slice(-50).join('\n')
+        const suffixLines = suffix.split('\n')
+        const trimmedSuffix = suffixLines.slice(0, 10).join('\n')
+
+        try {
+          const resp = await aiComplete({
+            prefix: trimmedPrefix,
+            suffix: trimmedSuffix,
+            collection: connStore.activeCollection || undefined,
+            db: connStore.activeDb || undefined,
+            field_names: _globalCachedFields,
+          })
+
+          if (token.isCancellationRequested || !resp.text) return { items: [] }
+
+          return {
+            items: [{
+              insertText: resp.text,
+              range: {
+                startLineNumber: position.lineNumber,
+                startColumn: position.column,
+                endLineNumber: position.lineNumber,
+                endColumn: position.column,
+              },
+            }],
+          }
+        } catch {
+          return { items: [] }
         }
-      } catch {
-        return { items: [] }
-      }
-    },
-    disposeInlineCompletions: () => {},
+      },
+      disposeInlineCompletions: () => {},
+    })
+  }
+  // ── End global providers ──────────────────────────────────────────────────
+
+  // Per-instance: key bindings
+  monacoEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, runAtCursor)
+  monacoEditor.addCommand(monaco.KeyMod.Shift | monaco.KeyMod.Alt | monaco.KeyCode.KeyF, formatQuery)
+  monacoEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+    editorStore.saveTabAt(props.tabIndex)
+    toast('Script saved', 'info')
+  })
+  monacoEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyS, () => {
+    editorStore.saveAll()
+    toast('All scripts saved', 'info')
   })
 
-  // Ctrl+Enter / Cmd+Enter → run statement at cursor (or selection)
-  monacoEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, runAtCursor)
-
-  // Shift+Alt+F → format document
-  monacoEditor.addCommand(monaco.KeyMod.Shift | monaco.KeyMod.Alt | monaco.KeyCode.KeyF, formatQuery)
-
-  // Auto-save on content change
+  // Per-instance: content change handler
   monacoEditor.onDidChangeModelContent(() => {
-    const tab = editorStore.activeTab()
-    if (!tab) return
-    editorStore.setContent(monacoEditor!.getValue())
-    // Debounce 2s
+    editorStore.setTabContent(props.tabIndex, monacoEditor!.getValue())
     if (autoSaveTimer) clearTimeout(autoSaveTimer)
-    autoSaveTimer = setTimeout(() => editorStore.saveActive(), 2000)
+    autoSaveTimer = setTimeout(() => editorStore.saveTabAt(props.tabIndex), 2000)
   })
 })
 
 onBeforeUnmount(() => {
-  inlineDisposable?.dispose()
-  completionDisposable?.dispose()
   monacoEditor?.dispose()
   if (autoSaveTimer) clearTimeout(autoSaveTimer)
 })
@@ -287,49 +299,39 @@ watch(() => settingsStore.fontSize, (size) => {
 // ── External "insert + execute" trigger ───────────────────────────────────────
 watch(() => editorStore.pendingExec, async (query) => {
   if (!query || !monacoEditor) return
+  if (editorStore.activeTabIndex !== props.tabIndex) return  // only active instance handles this
   editorStore.pendingExec = null
 
-  // If no tab is open, nothing to append to — just execute directly
-  const current = editorStore.activeTab() ? monacoEditor.getValue() : ''
+  const current = monacoEditor.getValue()
   const appended = (current.trimEnd() ? current.trimEnd() + '\n\n' : '') + query + '\n'
   monacoEditor.setValue(appended)
-  editorStore.setContent(appended)
+  editorStore.setTabContent(props.tabIndex, appended)
 
-  // Scroll to the appended line
   const lineCount = monacoEditor.getModel()?.getLineCount() ?? 1
   monacoEditor.revealLine(lineCount)
 
-  // Execute only the new statement (strip trailing semicolon for parser)
   const stmt = query.replace(/;\s*$/, '')
   await executeStatements([stmt])
 })
 
-// ── Sync editor content when tab changes ─────────────────────────────────────
-watch(() => editorStore.activeTabIndex, () => {
-  const tab = editorStore.activeTab()
-  if (monacoEditor && tab) {
-    monacoEditor.setValue(tab.content)
-    monacoEditor.setScrollTop(0)
-  } else if (monacoEditor && !tab) {
-    monacoEditor.setValue('// Select a collection from the tree or open a script\n')
-  }
-})
-
-// ── Autocomplete: update when collection changes ──────────────────────────────
+// ── Autocomplete: update when collection changes or tab becomes active ────────
 watch(() => connStore.activeCollection, async (col) => {
+  if (editorStore.activeTabIndex !== props.tabIndex) return
   const conn = connStore.activeConn
   const db = connStore.activeDb
   if (!col || !conn || !db) return
   try {
     const fields = await getFieldPaths(conn, db, col)
-    cachedFields = fields
+    _globalCachedFields = fields
     updateCompletions(fields)
   } catch { /* ignore */ }
 })
 
+// (Tab activation: field + collection completions are refreshed in the watcher below updateCollectionCompletions)
+
 function updateCompletions(fields: string[]) {
-  completionDisposable?.dispose()
-  completionDisposable = monaco.languages.registerCompletionItemProvider('javascript', {
+  _globalFieldDisposable?.dispose()
+  _globalFieldDisposable = monaco.languages.registerCompletionItemProvider('javascript', {
     provideCompletionItems(model, position) {
       const word = model.getWordUntilPosition(position)
       const range = {
@@ -350,6 +352,86 @@ function updateCompletions(fields: string[]) {
   })
 }
 
+// ── Collection name completions ──────────────────────────────────────────────
+function updateCollectionCompletions(collections: string[]) {
+  _globalCollectionDisposable?.dispose()
+  _globalCollectionDisposable = monaco.languages.registerCompletionItemProvider('javascript', {
+    triggerCharacters: ['"', "'"],
+    provideCompletionItems(model, position) {
+      // Check if cursor is inside getCollection("...") context
+      const lineContent = model.getLineContent(position.lineNumber)
+      const textBefore = lineContent.substring(0, position.column - 1)
+      if (!/getCollection\s*\(\s*["'][^"']*$/.test(textBefore)) return { suggestions: [] }
+
+      // Find the start of the string (after the quote)
+      const quoteMatch = textBefore.match(/getCollection\s*\(\s*["']([^"']*)$/)
+      const partialText = quoteMatch?.[1] ?? ''
+      const startColumn = position.column - partialText.length
+
+      const range = {
+        startLineNumber: position.lineNumber,
+        endLineNumber: position.lineNumber,
+        startColumn,
+        endColumn: position.column,
+      }
+      return {
+        suggestions: collections.map(c => ({
+          label: c,
+          kind: monaco.languages.CompletionItemKind.Module,
+          documentation: `Collection: ${c}`,
+          insertText: c,
+          range,
+        })),
+      }
+    },
+  })
+}
+
+// Update collection completions when DB changes
+watch(() => connStore.activeDb, async (db) => {
+  if (editorStore.activeTabIndex !== props.tabIndex) return
+  const conn = connStore.activeConn
+  if (!db || !conn) return
+  // Try tree cache first, otherwise fetch
+  const cached = connStore.tree[conn.id]?.expandedDbs[db]
+  if (cached) {
+    updateCollectionCompletions(cached)
+  } else {
+    try {
+      const cols = await listCollections(conn, db)
+      updateCollectionCompletions(cols)
+    } catch { /* ignore */ }
+  }
+})
+
+// When this tab becomes active, also refresh collection completions
+watch(() => editorStore.activeTabIndex, async (idx) => {
+  if (idx !== props.tabIndex) return
+  const tab = editorStore.tabs[props.tabIndex]
+  if (!tab?.connId || !tab.dbName) return
+  const conn = connStore.connections.find(c => c.id === tab.connId)
+  if (!conn) return
+
+  // Refresh collections
+  const cached = connStore.tree[conn.id]?.expandedDbs[tab.dbName]
+  if (cached) {
+    updateCollectionCompletions(cached)
+  } else {
+    try {
+      const cols = await listCollections(conn, tab.dbName)
+      updateCollectionCompletions(cols)
+    } catch { /* ignore */ }
+  }
+
+  // Also refresh fields if collection is set
+  if (!tab.collectionName) return
+  try {
+    const fields = await getFieldPaths(conn, tab.dbName, tab.collectionName)
+    _globalCachedFields = fields
+    updateCompletions(fields)
+  } catch { /* ignore */ }
+}, { immediate: false })
+
 // ── Format query ──────────────────────────────────────────────────────────────
 function formatQuery() {
   monacoEditor?.getAction('editor.action.formatDocument')?.run()
@@ -357,16 +439,29 @@ function formatQuery() {
 
 // ── Run query helpers ─────────────────────────────────────────────────────────
 async function executeStatements(stmts: string[]) {
-  const conn = connStore.activeConn
-  const db = connStore.activeDb
+  // Prefer the tab's stored connection context; fall back to global active
+  const tab = editorStore.tabs[props.tabIndex]
+  const connId = tab?.connId || connStore.activeConn?.id
+  const conn = connId
+    ? connStore.connections.find(c => c.id === connId) ?? connStore.activeConn
+    : connStore.activeConn
+  const db = tab?.dbName || connStore.activeDb
   if (!conn) { toast('Select a connection first', 'error'); return }
   if (!db) { toast('Select a database first', 'error'); return }
   if (!stmts.length) { toast('No valid statement found', 'error'); return }
+
+  // Ensure connection is alive before executing (auto-reconnect if needed)
+  const alive = await connStore.ensureConnected(conn.id)
+  if (!alive) { toast('Could not connect to server', 'error'); return }
+
+  // Sync global UI state to this tab's context so breadcrumb/tree match
+  connStore.selectCollection(conn, db, tab?.collectionName || connStore.activeCollection || '')
 
   editorStore.isExecuting = true
   const label = stmts.length === 1 ? 'Executing…' : `Executing ${stmts.length} statements…`
   toast(label, 'info')
 
+  const limit = tab?.queryLimit ?? 50
   try {
     const items: StatementResult[] = []
     const isSinglePaginatable = stmts.length === 1
@@ -375,7 +470,7 @@ async function executeStatements(stmts: string[]) {
     for (let i = 0; i < stmts.length; i++) {
       let stmt = stmts[i]
       if (/\.(find|aggregate)\s*\(/.test(stmt) && !/.limit\s*\(/.test(stmt)) {
-        stmt = `${stmt}.limit(${editorStore.queryLimit})`
+        stmt = `${stmt}.limit(${limit})`
       }
       const result = await executeQuery(conn, db, stmt)
       items.push({ label: `#${i + 1}`, result })
@@ -397,12 +492,10 @@ async function runAtCursor() {
   const sel = monacoEditor.getSelection()
   const selText = sel ? monacoEditor.getModel()?.getValueInRange(sel) : ''
   if (selText?.trim()) {
-    // Run selected text
     const stmts = extractAllStatements(selText.trim()).filter(Boolean)
     await executeStatements(stmts)
     return
   }
-  // No selection — find statement at cursor
   const model = monacoEditor.getModel()
   if (!model) return
   const pos = monacoEditor.getPosition()
@@ -425,14 +518,20 @@ async function runAll() {
   await executeStatements(stmts)
 }
 
-function extractStatementAtCursor(text: string, offset: number): string {
-  // Strip line comments but preserve offsets
-  const src = text.replace(/\/\/[^\n]*/g, m => ' '.repeat(m.length))
+function stripAllComments(s: string): string {
+  return s
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n')
+}
 
-  // Walk forward to cursor, tracking statement boundaries
+function extractStatementAtCursor(text: string, offset: number): string {
+  // Replace both line and block comments with spaces to preserve char positions
+  let src = text.replace(/\/\/[^\n]*/g, m => ' '.repeat(m.length))
+  src = src.replace(/\/\*[\s\S]*?\*\//g, m => ' '.repeat(m.length))
+
   let start = 0
-  let prevStart = 0  // start of the statement before the last ';'
-  let lastSemi = -1  // position of the last ';' at depth 0 before cursor
+  let prevStart = 0
+  let lastSemi = -1
   let depth = 0
   let inStr: string | null = null
   for (let i = 0; i < offset && i < src.length; i++) {
@@ -452,7 +551,6 @@ function extractStatementAtCursor(text: string, offset: number): string {
     }
   }
 
-  // Walk forward from start to find next ';' at depth 0
   depth = 0
   inStr = null
   let end = src.length
@@ -473,21 +571,18 @@ function extractStatementAtCursor(text: string, offset: number): string {
   }
 
   const raw = text.slice(start, end)
-  const result = stripLineComments(raw).trim()
-  // Cursor is right after a ';' → fall back to the statement that ended there
+  const result = stripAllComments(raw).trim()
   if (!result && lastSemi >= 0) {
-    return stripLineComments(text.slice(prevStart, lastSemi)).trim()
+    return stripAllComments(text.slice(prevStart, lastSemi)).trim()
   }
   return result
 }
 
-function stripLineComments(s: string): string {
-  return s.split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n')
-}
-
 function extractAllStatements(text: string): string[] {
-  // Strip line comments
-  const src = text.split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n')
+  // Strip block comments first, then line comments
+  const src = text
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n')
   const stmts: string[] = []
   let depth = 0
   let inStr: string | null = null
@@ -521,21 +616,6 @@ function extractAllStatements(text: string): string[] {
 
 <template>
   <div class="editor-root">
-    <!-- Tab bar -->
-    <div class="tabs-bar">
-      <div class="tabs-list">
-        <div
-          v-for="(tab, i) in editorStore.tabs"
-          :key="tab.script.path"
-          :class="['tab', { active: i === editorStore.activeTabIndex }]"
-          @click="editorStore.switchTab(i)"
-        >
-          <span class="tab-name">{{ tab.script.name }}{{ tab.modified ? ' ●' : '' }}</span>
-          <button class="tab-close" title="Close" @click.stop="editorStore.closeTab(i)">✕</button>
-        </div>
-      </div>
-    </div>
-
     <!-- Editor toolbar -->
     <div class="editor-toolbar">
       <button
@@ -557,7 +637,7 @@ function extractAllStatements(text: string): string[] {
       <span class="editor-hint">Ctrl+Enter: cursor statement · select text for partial run</span>
       <span class="toolbar-spacer" />
       <button class="btn-ghost" style="font-size:11px" title="Format document (Shift+Alt+F)" @click="formatQuery">Format</button>
-      <button class="btn-ghost" style="font-size:11px" @click="editorStore.saveActive()">Save</button>
+      <button class="btn-ghost" style="font-size:11px" @click="editorStore.saveTabAt(props.tabIndex)">Save</button>
     </div>
 
     <!-- Monaco container -->
@@ -567,31 +647,6 @@ function extractAllStatements(text: string): string[] {
 
 <style scoped>
 .editor-root { display: flex; flex-direction: column; height: 100%; overflow: hidden; background: var(--bg); }
-
-/* Tabs */
-.tabs-bar {
-  display: flex; align-items: center;
-  background: var(--bg-sidebar); border-bottom: 1px solid var(--border);
-  height: 30px; flex-shrink: 0; overflow-x: auto; overflow-y: hidden;
-}
-.tabs-list { display: flex; height: 100%; }
-.tab {
-  display: flex; align-items: center; gap: 6px;
-  padding: 0 10px; font-size: 11px; cursor: pointer;
-  border-right: 1px solid var(--border); white-space: nowrap;
-  color: var(--text-dim); background: transparent;
-  transition: background 0.1s;
-}
-.tab:hover { background: var(--bg-hover); }
-.tab.active { background: var(--bg); color: var(--text); border-bottom: 2px solid var(--accent); }
-.tab-name { max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
-.tab-close {
-  font-size: 10px; background: transparent; color: var(--text-muted);
-  border-radius: 2px; padding: 1px 3px;
-  opacity: 0; transition: opacity 0.1s;
-}
-.tab:hover .tab-close { opacity: 1; }
-.tab-close:hover { background: var(--bg-hover); color: var(--red); }
 
 /* Toolbar */
 .editor-toolbar {

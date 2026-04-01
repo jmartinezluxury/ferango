@@ -263,6 +263,28 @@ pub async fn disconnect(
 }
 
 #[tauri::command]
+pub async fn check_connection(
+    conn_id: String,
+    pool: State<'_, MongoPool>,
+) -> Result<bool, String> {
+    let client = {
+        let pool_map = pool.0.lock().map_err(|e| e.to_string())?;
+        pool_map.get(&conn_id).cloned()
+    };
+    match client {
+        Some(c) => match c.database("admin").run_command(doc! { "ping": 1 }).await {
+            Ok(_) => Ok(true),
+            Err(_) => {
+                // Dead connection — remove from pool so next call creates a fresh one
+                pool.0.lock().map_err(|e| e.to_string())?.remove(&conn_id);
+                Ok(false)
+            }
+        },
+        None => Ok(false),
+    }
+}
+
+#[tauri::command]
 pub async fn create_collection(
     conn: ConnectionConfig,
     db_name: String,
@@ -558,7 +580,37 @@ fn ejson_value_to_bson(val: serde_json::Value) -> mongodb::bson::Bson {
             if let Some(i) = n.as_i64() { Bson::Int64(i) }
             else { Bson::Double(n.as_f64().unwrap_or(0.0)) }
         }
-        serde_json::Value::String(s) => Bson::String(s),
+        serde_json::Value::String(s) => {
+            // Detect BSON wrapper patterns inside quoted strings (e.g., from copy-paste)
+            // ISODate("...") or Date("...")
+            if let Some(inner) = s.strip_prefix("ISODate(\"").and_then(|r| r.strip_suffix("\")"))
+                .or_else(|| s.strip_prefix("Date(\"").and_then(|r| r.strip_suffix("\")")))
+            {
+                if let Some(ms) = iso_str_to_millis(inner) {
+                    return Bson::DateTime(mongodb::bson::DateTime::from_millis(ms));
+                }
+            }
+            // ObjectId("...")
+            if let Some(inner) = s.strip_prefix("ObjectId(\"").and_then(|r| r.strip_suffix("\")")) {
+                if let Ok(oid) = mongodb::bson::oid::ObjectId::parse_str(inner) {
+                    return Bson::ObjectId(oid);
+                }
+            }
+            // NumberDecimal("...")
+            if let Some(inner) = s.strip_prefix("NumberDecimal(\"").and_then(|r| r.strip_suffix("\")")) {
+                if let Ok(d) = inner.parse::<f64>() {
+                    return Bson::Double(d);
+                }
+            }
+            // NumberLong(...)
+            if let Some(inner) = s.strip_prefix("NumberLong(").and_then(|r| r.strip_suffix(")")) {
+                let inner = inner.trim_matches('"');
+                if let Ok(n) = inner.parse::<i64>() {
+                    return Bson::Int64(n);
+                }
+            }
+            Bson::String(s)
+        }
         serde_json::Value::Array(arr) => {
             Bson::Array(arr.into_iter().map(ejson_value_to_bson).collect())
         }
@@ -842,6 +894,15 @@ fn remove_js_comments(s: &str) -> String {
     let len = chars.len();
     let mut i = 0;
     while i < len {
+        // Block comment: /* ... */
+        if !in_str && i + 1 < len && chars[i] == '/' && chars[i+1] == '*' {
+            i += 2; // skip /*
+            while i + 1 < len && !(chars[i] == '*' && chars[i+1] == '/') { i += 1; }
+            if i + 1 < len { i += 2; } // skip */
+            out.push(' '); // preserve spacing
+            continue;
+        }
+        // Line comment: //
         if !in_str && i + 1 < len && chars[i] == '/' && chars[i+1] == '/' {
             while i < len && chars[i] != '\n' { i += 1; }
             continue;

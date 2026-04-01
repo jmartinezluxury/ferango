@@ -14,6 +14,32 @@ const connStore = useConnectionsStore()
 const editorStore = useEditorStore()
 const toast = inject<(msg: string, type?: 'success' | 'error' | 'info') => void>('toast')!
 
+// ── Tree filter ──────────────────────────────────────────────────────────────
+const treeFilter = ref('')
+const q = computed(() => treeFilter.value.toLowerCase().trim())
+
+function filterDbs(databases: string[]): string[] {
+  if (!q.value) return databases
+  return databases.filter(db => db.toLowerCase().includes(q.value))
+}
+function filterCols(cols: string[]): string[] {
+  if (!q.value) return cols
+  return cols.filter(c => c.toLowerCase().includes(q.value))
+}
+function connMatchesFilter(conn: ConnectionConfig): boolean {
+  if (!q.value) return true
+  // Connection name matches
+  if (conn.name.toLowerCase().includes(q.value)) return true
+  // Any database or collection matches
+  const node = connStore.tree[conn.id]
+  if (!node) return false
+  if (node.databases.some(db => db.toLowerCase().includes(q.value))) return true
+  for (const [, cols] of Object.entries(node.expandedDbs)) {
+    if (cols.some(c => c.toLowerCase().includes(q.value))) return true
+  }
+  return false
+}
+
 // ── Connection modal ───────────────────────────────────────────────────────────
 const showModal = ref(false)
 const editingConn = ref<ConnectionConfig | null>(null)
@@ -50,6 +76,26 @@ function toggleGroup(g: string) {
   const s = new Set(expandedGroups.value)
   s.has(g) ? s.delete(g) : s.add(g)
   expandedGroups.value = s
+}
+
+// ── Focus on active tab's DB context ─────────────────────────────────────────
+async function focusActiveTabDb() {
+  const tab = editorStore.activeTab()
+  if (!tab?.connId || !tab.dbName) {
+    toast('No database context in current tab', 'info')
+    return
+  }
+  const conn = connStore.connections.find(c => c.id === tab.connId)
+  if (!conn) { toast('Connection not found', 'error'); return }
+
+  // Ensure connected, expand tree, and select
+  await connStore.ensureConnected(conn.id)
+  connStore.selectCollection(conn, tab.dbName, tab.collectionName)
+  await connStore.expandToContext(conn, tab.dbName)
+
+  // Scroll the tree node into view
+  const el = document.querySelector(`.tree-conn[data-conn-id="${conn.id}"]`)
+  el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
 }
 
 const groupedConnections = computed(() => {
@@ -390,8 +436,13 @@ onBeforeUnmount(() => document.removeEventListener('click', closeCtxMenu))
   <div class="tree-root">
     <div class="tree-header">
       <span class="tree-title">Connections</span>
+      <button class="btn-icon" title="Focus on active tab's DB" @click="focusActiveTabDb">⊙</button>
       <button class="btn-icon" title="Import from Compass" @click="openImport">↓</button>
       <button class="btn-icon" title="New connection" @click="openNew">＋</button>
+    </div>
+
+    <div v-if="connStore.connections.length" class="tree-search">
+      <input v-model="treeFilter" placeholder="Filter…" />
     </div>
 
     <div class="tree-body">
@@ -403,79 +454,85 @@ onBeforeUnmount(() => document.removeEventListener('click', closeCtxMenu))
 
       <!-- Grouped connections -->
       <template v-for="(conns, g) in groupedConnections.groups" :key="String(g)">
-        <div class="tree-node tree-group" @click="toggleGroup(String(g))">
-          <span class="tree-caret">{{ expandedGroups.has(String(g)) ? '▾' : '▸' }}</span>
-          <span class="tree-icon group-icon">▣</span>
-          <span class="tree-label group-label">{{ g }}</span>
-          <span class="tree-badge">{{ conns.length }}</span>
-        </div>
-        <template v-if="expandedGroups.has(String(g))">
-          <div v-for="conn in conns" :key="conn.id" class="tree-section" style="padding-left:12px">
-            <div class="tree-node tree-conn" :data-conn-id="conn.id" :class="{ active: connStore.activeConn?.id === conn.id }" @click="onToggleConn(conn)">
-              <span class="tree-caret">{{ connStore.tree[conn.id]?.expanded ? '▾' : '▸' }}</span>
-              <span class="tree-icon">⬡</span>
-              <span class="tree-label">{{ conn.name }}</span>
-              <span class="tree-actions">
-                <button class="btn-icon tree-action" title="Edit" @click.stop="openEdit(conn)">✎</button>
-                <button class="btn-icon tree-action" title="Delete" @click.stop="remove(conn.id, $event)">✕</button>
-              </span>
-            </div>
-            <template v-if="connStore.tree[conn.id]?.expanded">
-              <div v-if="!connStore.tree[conn.id].databases.length" class="tree-node tree-loading-msg" style="padding-left:40px">
-                <template v-if="loadingConns.has(conn.id)"><span class="loading-dot" />Loading…</template>
-                <template v-else>No databases</template>
-              </div>
-              <div v-for="db in connStore.tree[conn.id].databases" :key="db" class="tree-section">
-                <div class="tree-node tree-db" :class="{ active: connStore.activeDb === db && connStore.activeConn?.id === conn.id }" style="padding-left: 32px" @click="onToggleDb(conn, db)" @contextmenu="openCtxMenu($event, 'db', conn, db, '')">
-                  <span class="tree-caret">{{ connStore.tree[conn.id]?.expandedDbs[db] ? '▾' : '▸' }}</span>
-                  <span class="tree-icon db-icon">◈</span>
-                  <span class="tree-label">{{ db }}</span>
+        <template v-if="!q || conns.some(connMatchesFilter)">
+          <div class="tree-node tree-group" @click="toggleGroup(String(g))">
+            <span class="tree-caret">{{ expandedGroups.has(String(g)) ? '▾' : '▸' }}</span>
+            <span class="tree-icon group-icon">▣</span>
+            <span class="tree-label group-label">{{ g }}</span>
+            <span class="tree-badge">{{ conns.length }}</span>
+          </div>
+          <template v-if="expandedGroups.has(String(g)) || !!q">
+            <template v-for="conn in conns" :key="conn.id">
+              <div v-if="connMatchesFilter(conn)" class="tree-section" style="padding-left:12px">
+                <div class="tree-node tree-conn" :data-conn-id="conn.id" :class="{ active: connStore.activeConn?.id === conn.id }" @click="onToggleConn(conn)">
+                  <span class="tree-caret">{{ connStore.tree[conn.id]?.expanded ? '▾' : '▸' }}</span>
+                  <span class="tree-icon">⬡</span>
+                  <span class="tree-label">{{ conn.name }}</span>
+                  <span class="tree-actions">
+                    <button class="btn-icon tree-action" title="Edit" @click.stop="openEdit(conn)">✎</button>
+                    <button class="btn-icon tree-action" title="Delete" @click.stop="remove(conn.id, $event)">✕</button>
+                  </span>
                 </div>
-                <template v-if="connStore.tree[conn.id]?.expandedDbs[db]">
-                  <div v-if="!connStore.tree[conn.id].expandedDbs[db].length" class="tree-node tree-empty-msg" style="padding-left:60px">No collections</div>
-                  <div v-for="col in connStore.tree[conn.id].expandedDbs[db]" :key="col" class="tree-node tree-col" :class="{ active: connStore.activeCollection === col && connStore.activeDb === db && connStore.activeConn?.id === conn.id }" style="padding-left: 52px" @click="onSelectCol(conn, db, col)" @contextmenu="openCtxMenu($event, 'col', conn, db, col)">
-                    <span class="tree-icon col-icon">▤</span>
-                    <span class="tree-label">{{ col }}</span>
+                <template v-if="connStore.tree[conn.id]?.expanded">
+                  <div v-if="!connStore.tree[conn.id].databases.length" class="tree-node tree-loading-msg" style="padding-left:40px">
+                    <template v-if="loadingConns.has(conn.id)"><span class="loading-dot" />Loading…</template>
+                    <template v-else>No databases</template>
+                  </div>
+                  <div v-for="db in filterDbs(connStore.tree[conn.id].databases)" :key="db" class="tree-section">
+                    <div class="tree-node tree-db" :class="{ active: connStore.activeDb === db && connStore.activeConn?.id === conn.id }" style="padding-left: 32px" @click="onToggleDb(conn, db)" @contextmenu="openCtxMenu($event, 'db', conn, db, '')">
+                      <span class="tree-caret">{{ connStore.tree[conn.id]?.expandedDbs[db] ? '▾' : '▸' }}</span>
+                      <span class="tree-icon db-icon">◈</span>
+                      <span class="tree-label">{{ db }}</span>
+                    </div>
+                    <template v-if="connStore.tree[conn.id]?.expandedDbs[db]">
+                      <div v-if="!filterCols(connStore.tree[conn.id].expandedDbs[db]).length" class="tree-node tree-empty-msg" style="padding-left:60px">No collections</div>
+                      <div v-for="col in filterCols(connStore.tree[conn.id].expandedDbs[db])" :key="col" class="tree-node tree-col" :class="{ active: connStore.activeCollection === col && connStore.activeDb === db && connStore.activeConn?.id === conn.id }" style="padding-left: 52px" @click="onSelectCol(conn, db, col)" @contextmenu="openCtxMenu($event, 'col', conn, db, col)">
+                        <span class="tree-icon col-icon">▤</span>
+                        <span class="tree-label">{{ col }}</span>
+                      </div>
+                    </template>
                   </div>
                 </template>
               </div>
             </template>
-          </div>
+          </template>
         </template>
       </template>
 
       <!-- Ungrouped connections -->
-      <div v-for="conn in groupedConnections.ungrouped" :key="conn.id" class="tree-section">
-        <div class="tree-node tree-conn" :data-conn-id="conn.id" :class="{ active: connStore.activeConn?.id === conn.id }" @click="onToggleConn(conn)">
-          <span class="tree-caret">{{ connStore.tree[conn.id]?.expanded ? '▾' : '▸' }}</span>
-          <span class="tree-icon">⬡</span>
-          <span class="tree-label">{{ conn.name }}</span>
-          <span class="tree-actions">
-            <button class="btn-icon tree-action" title="Edit" @click.stop="openEdit(conn)">✎</button>
-            <button class="btn-icon tree-action" title="Delete" @click.stop="remove(conn.id, $event)">✕</button>
-          </span>
-        </div>
-        <template v-if="connStore.tree[conn.id]?.expanded">
-          <div v-if="!connStore.tree[conn.id].databases.length" class="tree-node tree-loading-msg" style="padding-left:28px">
-            <template v-if="loadingConns.has(conn.id)"><span class="loading-dot" />Loading…</template>
-            <template v-else>No databases</template>
+      <template v-for="conn in groupedConnections.ungrouped" :key="conn.id">
+        <div v-if="connMatchesFilter(conn)" class="tree-section">
+          <div class="tree-node tree-conn" :data-conn-id="conn.id" :class="{ active: connStore.activeConn?.id === conn.id }" @click="onToggleConn(conn)">
+            <span class="tree-caret">{{ connStore.tree[conn.id]?.expanded ? '▾' : '▸' }}</span>
+            <span class="tree-icon">⬡</span>
+            <span class="tree-label">{{ conn.name }}</span>
+            <span class="tree-actions">
+              <button class="btn-icon tree-action" title="Edit" @click.stop="openEdit(conn)">✎</button>
+              <button class="btn-icon tree-action" title="Delete" @click.stop="remove(conn.id, $event)">✕</button>
+            </span>
           </div>
-          <div v-for="db in connStore.tree[conn.id].databases" :key="db" class="tree-section">
-            <div class="tree-node tree-db" :class="{ active: connStore.activeDb === db && connStore.activeConn?.id === conn.id }" style="padding-left: 20px" @click="onToggleDb(conn, db)" @contextmenu="openCtxMenu($event, 'db', conn, db, '')">
-              <span class="tree-caret">{{ connStore.tree[conn.id]?.expandedDbs[db] ? '▾' : '▸' }}</span>
-              <span class="tree-icon db-icon">◈</span>
-              <span class="tree-label">{{ db }}</span>
+          <template v-if="connStore.tree[conn.id]?.expanded">
+            <div v-if="!connStore.tree[conn.id].databases.length" class="tree-node tree-loading-msg" style="padding-left:28px">
+              <template v-if="loadingConns.has(conn.id)"><span class="loading-dot" />Loading…</template>
+              <template v-else>No databases</template>
             </div>
-            <template v-if="connStore.tree[conn.id]?.expandedDbs[db]">
-              <div v-if="!connStore.tree[conn.id].expandedDbs[db].length" class="tree-node tree-empty-msg" style="padding-left:48px">No collections</div>
-              <div v-for="col in connStore.tree[conn.id].expandedDbs[db]" :key="col" class="tree-node tree-col" :class="{ active: connStore.activeCollection === col && connStore.activeDb === db && connStore.activeConn?.id === conn.id }" style="padding-left: 40px" @click="onSelectCol(conn, db, col)" @contextmenu="openCtxMenu($event, 'col', conn, db, col)">
-                <span class="tree-icon col-icon">▤</span>
-                <span class="tree-label">{{ col }}</span>
+            <div v-for="db in filterDbs(connStore.tree[conn.id].databases)" :key="db" class="tree-section">
+              <div class="tree-node tree-db" :class="{ active: connStore.activeDb === db && connStore.activeConn?.id === conn.id }" style="padding-left: 20px" @click="onToggleDb(conn, db)" @contextmenu="openCtxMenu($event, 'db', conn, db, '')">
+                <span class="tree-caret">{{ connStore.tree[conn.id]?.expandedDbs[db] ? '▾' : '▸' }}</span>
+                <span class="tree-icon db-icon">◈</span>
+                <span class="tree-label">{{ db }}</span>
               </div>
-            </template>
-          </div>
-        </template>
-      </div>
+              <template v-if="connStore.tree[conn.id]?.expandedDbs[db]">
+                <div v-if="!filterCols(connStore.tree[conn.id].expandedDbs[db]).length" class="tree-node tree-empty-msg" style="padding-left:48px">No collections</div>
+                <div v-for="col in filterCols(connStore.tree[conn.id].expandedDbs[db])" :key="col" class="tree-node tree-col" :class="{ active: connStore.activeCollection === col && connStore.activeDb === db && connStore.activeConn?.id === conn.id }" style="padding-left: 40px" @click="onSelectCol(conn, db, col)" @contextmenu="openCtxMenu($event, 'col', conn, db, col)">
+                  <span class="tree-icon col-icon">▤</span>
+                  <span class="tree-label">{{ col }}</span>
+                </div>
+              </template>
+            </div>
+          </template>
+        </div>
+      </template>
     </div>
   </div>
 
@@ -815,6 +872,8 @@ onBeforeUnmount(() => document.removeEventListener('click', closeCtxMenu))
   border-bottom: 1px solid var(--border); flex-shrink: 0;
 }
 .tree-title { user-select: none; }
+.tree-search { padding: 4px 6px; flex-shrink: 0; }
+.tree-search input { font-size: 11px; padding: 3px 6px; width: 100%; }
 .tree-body { flex: 1; overflow-y: auto; padding: 4px 0; }
 .tree-empty {
   display: flex; flex-direction: column; align-items: center;
