@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, inject, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, inject, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { open as openFilePicker } from '@tauri-apps/plugin-dialog'
 import { useConnectionsStore } from '../stores/connections'
 import { useEditorStore } from '../stores/editor'
@@ -77,6 +77,24 @@ function toggleGroup(g: string) {
   s.has(g) ? s.delete(g) : s.add(g)
   expandedGroups.value = s
 }
+
+// ── Auto-scroll tree to active node when tab context changes ─────────────────
+function scrollToActiveNode() {
+  nextTick(() => {
+    const activeNode = document.querySelector('.tree-body .tree-col.active') as HTMLElement
+      ?? document.querySelector('.tree-body .tree-db.active') as HTMLElement
+      ?? document.querySelector('.tree-body .tree-conn.active') as HTMLElement
+    activeNode?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  })
+}
+
+// Scroll on tab switch — use a short delay to let expandToContext (async) finish and tree render
+watch(() => editorStore.activeTabIndex, () => {
+  // Immediate attempt (works if tree is already expanded)
+  scrollToActiveNode()
+  // Delayed attempt (works after async expandToContext completes)
+  setTimeout(() => scrollToActiveNode(), 400)
+})
 
 // ── Focus on active tab's DB context ─────────────────────────────────────────
 async function focusActiveTabDb() {
@@ -173,9 +191,12 @@ async function onToggleConn(conn: ConnectionConfig) {
 async function onToggleDb(conn: ConnectionConfig, db: string) {
   try { await connStore.toggleDatabase(conn, db) }
   catch (e) { toast(String(e), 'error') }
+  // Sync to active tab so breadcrumb and execution stay consistent
+  editorStore.updateActiveTabContext(conn.id, db, '')
 }
 function onSelectCol(conn: ConnectionConfig, db: string, col: string) {
   connStore.selectCollection(conn, db, col)
+  editorStore.updateActiveTabContext(conn.id, db, col)
 }
 
 // ── Context menu ──────────────────────────────────────────────────────────────

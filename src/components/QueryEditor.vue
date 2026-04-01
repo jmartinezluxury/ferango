@@ -1,6 +1,5 @@
 <script lang="ts">
-// Module-level: shared across ALL QueryEditor instances
-// Prevents duplicate global Monaco provider registrations
+// Module-level: shared singleton state
 let _globalProvidersRegistered = false
 let _globalCachedFields: string[] = []
 let _globalFieldDisposable: import('monaco-editor').IDisposable | null = null
@@ -16,8 +15,6 @@ import { useConnectionsStore } from '../stores/connections'
 import { useSettingsStore } from '../stores/settings'
 import { executeQuery, getFieldPaths, listCollections, logQuery, aiComplete } from '../lib/tauri'
 
-const props = defineProps<{ tabIndex: number }>()
-
 const editorStore = useEditorStore()
 const connStore = useConnectionsStore()
 const settingsStore = useSettingsStore()
@@ -27,13 +24,61 @@ const containerEl = ref<HTMLDivElement | null>(null)
 let monacoEditor: monaco.editor.IStandaloneCodeEditor | null = null
 let autoSaveTimer: ReturnType<typeof setTimeout> | null = null
 
-// ── Monaco setup ──────────────────────────────────────────────────────────────
+// ── Single editor, multiple models (like VS Code) ────────────────────────────
+// Each tab gets its own ITextModel keyed by script path.
+// On tab switch we swap the model and save/restore view state (cursor, scroll).
+const models = new Map<string, monaco.editor.ITextModel>()
+const viewStates = new Map<string, monaco.editor.ICodeEditorViewState | null>()
+let suppressContentChange = false // guard to avoid feedback loops during model swap
+
+function getOrCreateModel(scriptPath: string, content: string): monaco.editor.ITextModel {
+  let model = models.get(scriptPath)
+  if (model && !model.isDisposed()) return model
+  const uri = monaco.Uri.parse(`ferango://scripts/${encodeURIComponent(scriptPath)}`)
+  // Check if Monaco already has a model with this URI (can happen after HMR)
+  model = monaco.editor.getModel(uri) ?? monaco.editor.createModel(content, 'javascript', uri)
+  models.set(scriptPath, model)
+  return model
+}
+
+function swapToTab(index: number) {
+  if (!monacoEditor) return
+  const tab = editorStore.tabs[index]
+  if (!tab) return
+
+  // Save current view state
+  const currentModel = monacoEditor.getModel()
+  if (currentModel) {
+    const currentPath = [...models.entries()].find(([, m]) => m === currentModel)?.[0]
+    if (currentPath) {
+      viewStates.set(currentPath, monacoEditor.saveViewState())
+    }
+  }
+
+  // Switch to new model
+  suppressContentChange = true
+  const model = getOrCreateModel(tab.script.path, tab.content)
+  monacoEditor.setModel(model)
+
+  // Restore view state (cursor, scroll)
+  const vs = viewStates.get(tab.script.path)
+  if (vs) monacoEditor.restoreViewState(vs)
+
+  suppressContentChange = false
+  monacoEditor.focus()
+}
+
+// ── Monaco setup (single instance) ───────────────────────────────────────────
 onMounted(() => {
   if (!containerEl.value) return
 
+  const activeTab = editorStore.tabs[editorStore.activeTabIndex]
+  const initialContent = activeTab?.content ?? '// Select a collection from the tree or open a script\n'
+  const initialPath = activeTab?.script.path ?? '__empty__'
+  const initialModel = getOrCreateModel(initialPath, initialContent)
+
   monacoEditor = monaco.editor.create(containerEl.value, {
-    value: editorStore.tabs[props.tabIndex]?.content ?? '// Select a collection from the tree or open a script\n',
-    language: 'javascript',
+    model: initialModel,
     theme: 'vs-dark',
     fontSize: settingsStore.fontSize,
     fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
@@ -49,7 +94,7 @@ onMounted(() => {
     scrollbar: { vertical: 'auto', horizontal: 'auto', verticalScrollbarSize: 6, horizontalScrollbarSize: 6 },
   })
 
-  // ── Global providers (registered only once across all instances) ──────────
+  // ── Global providers (registered only once) ────────────────────────────────
   if (!_globalProvidersRegistered) {
     _globalProvidersRegistered = true
 
@@ -99,7 +144,6 @@ onMounted(() => {
         }
 
         const operators: { label: string; doc: string; text: string; kind: monaco.languages.CompletionItemKind }[] = [
-          // ── Comparison ──
           { label: '$eq',  doc: 'Matches values equal to a specified value', text: '\\$eq: ${1:value}', kind: monaco.languages.CompletionItemKind.Operator },
           { label: '$ne',  doc: 'Matches values not equal to a specified value', text: '\\$ne: ${1:value}', kind: monaco.languages.CompletionItemKind.Operator },
           { label: '$gt',  doc: 'Matches values greater than a specified value', text: '\\$gt: ${1:value}', kind: monaco.languages.CompletionItemKind.Operator },
@@ -108,22 +152,17 @@ onMounted(() => {
           { label: '$lte', doc: 'Matches values less than or equal to a specified value', text: '\\$lte: ${1:value}', kind: monaco.languages.CompletionItemKind.Operator },
           { label: '$in',  doc: 'Matches any of the values specified in an array', text: '\\$in: [${1}]', kind: monaco.languages.CompletionItemKind.Operator },
           { label: '$nin', doc: 'Matches none of the values specified in an array', text: '\\$nin: [${1}]', kind: monaco.languages.CompletionItemKind.Operator },
-          // ── Logical ──
           { label: '$and', doc: 'Joins query clauses with a logical AND', text: '\\$and: [{ ${1} }, { ${2} }]', kind: monaco.languages.CompletionItemKind.Operator },
           { label: '$or',  doc: 'Joins query clauses with a logical OR', text: '\\$or: [{ ${1} }, { ${2} }]', kind: monaco.languages.CompletionItemKind.Operator },
           { label: '$not', doc: 'Inverts the effect of a query expression', text: '\\$not: { ${1} }', kind: monaco.languages.CompletionItemKind.Operator },
           { label: '$nor', doc: 'Joins query clauses with a logical NOR', text: '\\$nor: [{ ${1} }, { ${2} }]', kind: monaco.languages.CompletionItemKind.Operator },
-          // ── Element ──
           { label: '$exists', doc: 'Matches documents that have the specified field', text: '\\$exists: ${1:true}', kind: monaco.languages.CompletionItemKind.Operator },
           { label: '$type',   doc: 'Selects documents if a field is of the specified type', text: '\\$type: "${1:string}"', kind: monaco.languages.CompletionItemKind.Operator },
-          // ── Array ──
           { label: '$all',       doc: 'Matches arrays that contain all specified elements', text: '\\$all: [${1}]', kind: monaco.languages.CompletionItemKind.Operator },
           { label: '$elemMatch', doc: 'Matches documents that contain an array element matching all conditions', text: '\\$elemMatch: { ${1} }', kind: monaco.languages.CompletionItemKind.Operator },
           { label: '$size',      doc: 'Matches arrays with the specified number of elements', text: '\\$size: ${1:1}', kind: monaco.languages.CompletionItemKind.Operator },
-          // ── Evaluation ──
           { label: '$regex',  doc: 'Selects documents matching a regular expression', text: '\\$regex: /${1:pattern}/${2:flags}', kind: monaco.languages.CompletionItemKind.Operator },
           { label: '$expr',   doc: 'Use aggregation expressions within the query language', text: '\\$expr: { ${1} }', kind: monaco.languages.CompletionItemKind.Operator },
-          // ── Update ──
           { label: '$set',      doc: 'Sets the value of a field', text: '\\$set: { ${1:field}: ${2:value} }', kind: monaco.languages.CompletionItemKind.Function },
           { label: '$unset',    doc: 'Removes the specified field from a document', text: '\\$unset: { ${1:field}: "" }', kind: monaco.languages.CompletionItemKind.Function },
           { label: '$inc',      doc: 'Increments the value of a field by a specified amount', text: '\\$inc: { ${1:field}: ${2:1} }', kind: monaco.languages.CompletionItemKind.Function },
@@ -134,7 +173,6 @@ onMounted(() => {
           { label: '$min',      doc: 'Updates the field if the specified value is less than the existing value', text: '\\$min: { ${1:field}: ${2:value} }', kind: monaco.languages.CompletionItemKind.Function },
           { label: '$max',      doc: 'Updates the field if the specified value is greater than the existing value', text: '\\$max: { ${1:field}: ${2:value} }', kind: monaco.languages.CompletionItemKind.Function },
           { label: '$mul',      doc: 'Multiplies the value of a field by a specified amount', text: '\\$mul: { ${1:field}: ${2:value} }', kind: monaco.languages.CompletionItemKind.Function },
-          // ── Aggregation stages ──
           { label: '$match',   doc: 'Filters documents to pass only matching documents to the next stage', text: '\\$match: { ${1} }', kind: monaco.languages.CompletionItemKind.Module },
           { label: '$group',   doc: 'Groups documents by a specified expression', text: '\\$group: { _id: ${1:null}, ${2:field}: { \\$sum: ${3:1} } }', kind: monaco.languages.CompletionItemKind.Module },
           { label: '$project', doc: 'Reshapes documents by including, excluding, or adding fields', text: '\\$project: { ${1:field}: 1 }', kind: monaco.languages.CompletionItemKind.Module },
@@ -149,7 +187,6 @@ onMounted(() => {
           { label: '$bucket',  doc: 'Categorizes documents into groups (buckets)', text: '\\$bucket: {\n\tgroupBy: "\\$${1:field}",\n\tboundaries: [${2:0, 100, 200}],\n\tdefault: "Other"\n}', kind: monaco.languages.CompletionItemKind.Module },
           { label: '$facet',   doc: 'Process multiple aggregation pipelines in a single stage', text: '\\$facet: {\n\t${1:output}: [{ ${2} }]\n}', kind: monaco.languages.CompletionItemKind.Module },
           { label: '$replaceRoot', doc: 'Replaces the document with the specified embedded document', text: '\\$replaceRoot: { newRoot: "\\$${1:field}" }', kind: monaco.languages.CompletionItemKind.Module },
-          // ── Accumulators (inside $group) ──
           { label: '$sum',   doc: 'Calculates the sum', text: '\\$sum: ${1:1}', kind: monaco.languages.CompletionItemKind.Operator },
           { label: '$avg',   doc: 'Calculates the average', text: '\\$avg: "\\$${1:field}"', kind: monaco.languages.CompletionItemKind.Operator },
           { label: '$first', doc: 'Returns the first value in a group', text: '\\$first: "\\$${1:field}"', kind: monaco.languages.CompletionItemKind.Operator },
@@ -202,10 +239,6 @@ onMounted(() => {
         }
       },
     })
-
-    // Register collection name completions (inside getCollection("...") or db.xxx)
-    // This is a static registration; the actual collection list is updated dynamically
-    // via _globalCollectionDisposable (see updateCollectionCompletions below).
 
     // ── AI Inline Completions ──────────────────────────────────────────────────
     monaco.languages.registerInlineCompletionsProvider('javascript', {
@@ -266,11 +299,11 @@ onMounted(() => {
   }
   // ── End global providers ──────────────────────────────────────────────────
 
-  // Per-instance: key bindings
+  // Key bindings
   monacoEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, runAtCursor)
   monacoEditor.addCommand(monaco.KeyMod.Shift | monaco.KeyMod.Alt | monaco.KeyCode.KeyF, formatQuery)
   monacoEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
-    editorStore.saveTabAt(props.tabIndex)
+    editorStore.saveActive()
     toast('Script saved', 'info')
   })
   monacoEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyS, () => {
@@ -278,34 +311,53 @@ onMounted(() => {
     toast('All scripts saved', 'info')
   })
 
-  // Per-instance: content change handler
+  // Content change handler — syncs Monaco → tab store
   monacoEditor.onDidChangeModelContent(() => {
-    editorStore.setTabContent(props.tabIndex, monacoEditor!.getValue())
+    if (suppressContentChange) return
+    const idx = editorStore.activeTabIndex
+    if (idx < 0) return
+    editorStore.setTabContent(idx, monacoEditor!.getValue())
     if (autoSaveTimer) clearTimeout(autoSaveTimer)
-    autoSaveTimer = setTimeout(() => editorStore.saveTabAt(props.tabIndex), 2000)
+    autoSaveTimer = setTimeout(() => editorStore.saveTabAt(idx), 2000)
   })
 })
 
 onBeforeUnmount(() => {
+  // Dispose all models
+  for (const [, model] of models) {
+    if (!model.isDisposed()) model.dispose()
+  }
+  models.clear()
+  viewStates.clear()
   monacoEditor?.dispose()
   if (autoSaveTimer) clearTimeout(autoSaveTimer)
 })
 
-// ── Sync font size from settings ──────────────────────────────────────────────
+// ── Tab switching: swap Monaco model ─────────────────────────────────────────
+watch(() => editorStore.activeTabIndex, (idx) => {
+  if (idx >= 0) swapToTab(idx)
+})
+
+// ── New tab opened: create model and swap to it ──────────────────────────────
+watch(() => editorStore.tabs.length, () => {
+  const idx = editorStore.activeTabIndex
+  if (idx >= 0) swapToTab(idx)
+})
+
+// ── Sync font size from settings ─────────────────────────────────────────────
 watch(() => settingsStore.fontSize, (size) => {
   monacoEditor?.updateOptions({ fontSize: size })
 })
 
-// ── External "insert + execute" trigger ───────────────────────────────────────
+// ── External "insert + execute" trigger ──────────────────────────────────────
 watch(() => editorStore.pendingExec, async (query) => {
   if (!query || !monacoEditor) return
-  if (editorStore.activeTabIndex !== props.tabIndex) return  // only active instance handles this
   editorStore.pendingExec = null
 
   const current = monacoEditor.getValue()
   const appended = (current.trimEnd() ? current.trimEnd() + '\n\n' : '') + query + '\n'
   monacoEditor.setValue(appended)
-  editorStore.setTabContent(props.tabIndex, appended)
+  editorStore.setTabContent(editorStore.activeTabIndex, appended)
 
   const lineCount = monacoEditor.getModel()?.getLineCount() ?? 1
   monacoEditor.revealLine(lineCount)
@@ -314,9 +366,8 @@ watch(() => editorStore.pendingExec, async (query) => {
   await executeStatements([stmt])
 })
 
-// ── Autocomplete: update when collection changes or tab becomes active ────────
+// ── Autocomplete: update when collection changes ─────────────────────────────
 watch(() => connStore.activeCollection, async (col) => {
-  if (editorStore.activeTabIndex !== props.tabIndex) return
   const conn = connStore.activeConn
   const db = connStore.activeDb
   if (!col || !conn || !db) return
@@ -327,7 +378,45 @@ watch(() => connStore.activeCollection, async (col) => {
   } catch { /* ignore */ }
 })
 
-// (Tab activation: field + collection completions are refreshed in the watcher below updateCollectionCompletions)
+// ── Autocomplete: update when DB changes ─────────────────────────────────────
+watch(() => connStore.activeDb, async (db) => {
+  const conn = connStore.activeConn
+  if (!db || !conn) return
+  const cached = connStore.tree[conn.id]?.expandedDbs[db]
+  if (cached) {
+    updateCollectionCompletions(cached)
+  } else {
+    try {
+      const cols = await listCollections(conn, db)
+      updateCollectionCompletions(cols)
+    } catch { /* ignore */ }
+  }
+})
+
+// ── Autocomplete: refresh on tab switch ──────────────────────────────────────
+watch(() => editorStore.activeTabIndex, async () => {
+  const tab = editorStore.activeTab()
+  if (!tab?.connId || !tab.dbName) return
+  const conn = connStore.connections.find(c => c.id === tab.connId)
+  if (!conn) return
+
+  const cached = connStore.tree[conn.id]?.expandedDbs[tab.dbName]
+  if (cached) {
+    updateCollectionCompletions(cached)
+  } else {
+    try {
+      const cols = await listCollections(conn, tab.dbName)
+      updateCollectionCompletions(cols)
+    } catch { /* ignore */ }
+  }
+
+  if (!tab.collectionName) return
+  try {
+    const fields = await getFieldPaths(conn, tab.dbName, tab.collectionName)
+    _globalCachedFields = fields
+    updateCompletions(fields)
+  } catch { /* ignore */ }
+})
 
 function updateCompletions(fields: string[]) {
   _globalFieldDisposable?.dispose()
@@ -352,18 +441,15 @@ function updateCompletions(fields: string[]) {
   })
 }
 
-// ── Collection name completions ──────────────────────────────────────────────
 function updateCollectionCompletions(collections: string[]) {
   _globalCollectionDisposable?.dispose()
   _globalCollectionDisposable = monaco.languages.registerCompletionItemProvider('javascript', {
     triggerCharacters: ['"', "'"],
     provideCompletionItems(model, position) {
-      // Check if cursor is inside getCollection("...") context
       const lineContent = model.getLineContent(position.lineNumber)
       const textBefore = lineContent.substring(0, position.column - 1)
       if (!/getCollection\s*\(\s*["'][^"']*$/.test(textBefore)) return { suggestions: [] }
 
-      // Find the start of the string (after the quote)
       const quoteMatch = textBefore.match(/getCollection\s*\(\s*["']([^"']*)$/)
       const partialText = quoteMatch?.[1] ?? ''
       const startColumn = position.column - partialText.length
@@ -387,68 +473,19 @@ function updateCollectionCompletions(collections: string[]) {
   })
 }
 
-// Update collection completions when DB changes
-watch(() => connStore.activeDb, async (db) => {
-  if (editorStore.activeTabIndex !== props.tabIndex) return
-  const conn = connStore.activeConn
-  if (!db || !conn) return
-  // Try tree cache first, otherwise fetch
-  const cached = connStore.tree[conn.id]?.expandedDbs[db]
-  if (cached) {
-    updateCollectionCompletions(cached)
-  } else {
-    try {
-      const cols = await listCollections(conn, db)
-      updateCollectionCompletions(cols)
-    } catch { /* ignore */ }
-  }
-})
-
-// When this tab becomes active, also refresh collection completions
-watch(() => editorStore.activeTabIndex, async (idx) => {
-  if (idx !== props.tabIndex) return
-  const tab = editorStore.tabs[props.tabIndex]
-  if (!tab?.connId || !tab.dbName) return
-  const conn = connStore.connections.find(c => c.id === tab.connId)
-  if (!conn) return
-
-  // Refresh collections
-  const cached = connStore.tree[conn.id]?.expandedDbs[tab.dbName]
-  if (cached) {
-    updateCollectionCompletions(cached)
-  } else {
-    try {
-      const cols = await listCollections(conn, tab.dbName)
-      updateCollectionCompletions(cols)
-    } catch { /* ignore */ }
-  }
-
-  // Also refresh fields if collection is set
-  if (!tab.collectionName) return
-  try {
-    const fields = await getFieldPaths(conn, tab.dbName, tab.collectionName)
-    _globalCachedFields = fields
-    updateCompletions(fields)
-  } catch { /* ignore */ }
-}, { immediate: false })
-
-// ── Format query ──────────────────────────────────────────────────────────────
+// ── Format query ─────────────────────────────────────────────────────────────
 function formatQuery() {
   monacoEditor?.getAction('editor.action.formatDocument')?.run()
 }
 
-// ── Run query helpers ─────────────────────────────────────────────────────────
+// ── Run query helpers ────────────────────────────────────────────────────────
 async function executeStatements(stmts: string[]) {
-  // Always use the global active context (what the breadcrumb shows).
-  // The tab's saved context is only for restoring on tab switch, not for execution.
-  // After execution, _saveConnContext persists the current context to the tab.
   const conn = connStore.activeConn
   const db = connStore.activeDb
   if (!conn) { toast('Select a connection first', 'error'); return }
   if (!db) { toast('Select a database first', 'error'); return }
   if (!stmts.length) { toast('No valid statement found', 'error'); return }
 
-  // Ensure connection is alive before executing (auto-reconnect if needed)
   const alive = await connStore.ensureConnected(conn.id)
   if (!alive) { toast('Could not connect to server', 'error'); return }
 
@@ -456,7 +493,7 @@ async function executeStatements(stmts: string[]) {
   const label = stmts.length === 1 ? 'Executing…' : `Executing ${stmts.length} statements…`
   toast(label, 'info')
 
-  const tab = editorStore.tabs[props.tabIndex]
+  const tab = editorStore.activeTab()
   const limit = tab?.queryLimit ?? 50
   try {
     const items: StatementResult[] = []
@@ -482,7 +519,6 @@ async function executeStatements(stmts: string[]) {
   }
 }
 
-// Ctrl+Enter: run selection if present, otherwise run statement at cursor
 async function runAtCursor() {
   if (!monacoEditor) return
   const sel = monacoEditor.getSelection()
@@ -503,7 +539,6 @@ async function runAtCursor() {
   await executeStatements([stmt])
 }
 
-// Run all: full file (or selection if present)
 async function runAll() {
   if (!monacoEditor) return
   const sel = monacoEditor.getSelection()
@@ -521,7 +556,6 @@ function stripAllComments(s: string): string {
 }
 
 function extractStatementAtCursor(text: string, offset: number): string {
-  // Replace both line and block comments with spaces to preserve char positions
   let src = text.replace(/\/\/[^\n]*/g, m => ' '.repeat(m.length))
   src = src.replace(/\/\*[\s\S]*?\*\//g, m => ' '.repeat(m.length))
 
@@ -575,7 +609,6 @@ function extractStatementAtCursor(text: string, offset: number): string {
 }
 
 function extractAllStatements(text: string): string[] {
-  // Strip block comments first, then line comments
   const src = text
     .replace(/\/\*[\s\S]*?\*\//g, ' ')
     .split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n')
@@ -633,10 +666,10 @@ function extractAllStatements(text: string): string[] {
       <span class="editor-hint">Ctrl+Enter: cursor statement · select text for partial run</span>
       <span class="toolbar-spacer" />
       <button class="btn-ghost" style="font-size:11px" title="Format document (Shift+Alt+F)" @click="formatQuery">Format</button>
-      <button class="btn-ghost" style="font-size:11px" @click="editorStore.saveTabAt(props.tabIndex)">Save</button>
+      <button class="btn-ghost" style="font-size:11px" @click="editorStore.saveActive()">Save</button>
     </div>
 
-    <!-- Monaco container -->
+    <!-- Monaco container (single instance, models swapped per tab) -->
     <div ref="containerEl" class="monaco-container" />
   </div>
 </template>

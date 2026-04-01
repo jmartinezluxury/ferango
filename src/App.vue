@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, provide } from 'vue'
+import { ref, computed, watch, onMounted, provide } from 'vue'
 import { useConnectionsStore } from './stores/connections'
 import { useEditorStore } from './stores/editor'
 import { useSettingsStore } from './stores/settings'
@@ -12,6 +12,18 @@ import ResultViewer from './components/ResultViewer.vue'
 const connStore = useConnectionsStore()
 const editorStore = useEditorStore()
 const settingsStore = useSettingsStore()
+
+// ── Breadcrumb: reads from the active tab's stored context ───────────────────
+const activeTabConnName = computed(() => {
+  const tab = editorStore.tabs[editorStore.activeTabIndex]
+  if (!tab?.connId) return connStore.activeConn?.name ?? ''
+  const conn = connStore.connections.find(c => c.id === tab.connId)
+  return conn?.name ?? connStore.activeConn?.name ?? ''
+})
+const activeTabDb = computed(() => {
+  const tab = editorStore.tabs[editorStore.activeTabIndex]
+  return tab?.dbName || connStore.activeDb || ''
+})
 
 // ── Settings modal ────────────────────────────────────────────────────────────
 const settingsOpen = ref(false)
@@ -103,16 +115,12 @@ onMounted(async () => {
       <span class="app-brand"><span class="brand-fer">Fer</span><span class="brand-ango">ango</span></span>
       <div class="toolbar-sep" />
       <span class="breadcrumb">
-        <span v-if="connStore.activeConn" class="bc-item">{{ connStore.activeConn.name }}</span>
-        <template v-if="connStore.activeDb">
+        <span v-if="activeTabConnName" class="bc-item">{{ activeTabConnName }}</span>
+        <template v-if="activeTabDb">
           <span class="bc-sep">›</span>
-          <span class="bc-item bc-db">{{ connStore.activeDb }}</span>
+          <span class="bc-item bc-db">{{ activeTabDb }}</span>
         </template>
-        <template v-if="connStore.activeCollection">
-          <span class="bc-sep">›</span>
-          <span class="bc-item bc-col">{{ connStore.activeCollection }}</span>
-        </template>
-        <span v-if="!connStore.activeConn" class="bc-empty">No connection selected</span>
+        <span v-if="!activeTabConnName" class="bc-empty">No connection selected</span>
       </span>
       <span class="toolbar-spacer" />
       <button class="btn-icon toolbar-btn" title="Keyboard shortcuts" @click="shortcutsOpen = true">?</button>
@@ -142,21 +150,23 @@ onMounted(async () => {
           </div>
         </div>
 
-        <!-- Workspace instances: one per tab, kept in DOM via v-show -->
-        <div
-          v-for="(tab, i) in editorStore.tabs"
-          :key="tab.script.path"
-          v-show="i === editorStore.activeTabIndex"
-          class="workspace"
-        >
+        <!-- Single workspace: one QueryEditor (model-swapped) + per-tab ResultViewers -->
+        <template v-if="editorStore.tabs.length > 0">
           <div class="editor-wrap" :style="{ height: editorH + 'px' }">
-            <QueryEditor :tabIndex="i" />
+            <QueryEditor />
           </div>
           <div class="resize-v" @mousedown.prevent="startResizeV" />
           <div class="viewer-wrap">
-            <ResultViewer :tabIndex="i" />
+            <div
+              v-for="(tab, i) in editorStore.tabs"
+              :key="tab.script.path"
+              v-show="i === editorStore.activeTabIndex"
+              style="height: 100%"
+            >
+              <ResultViewer :tabIndex="i" />
+            </div>
           </div>
-        </div>
+        </template>
 
         <!-- Empty state when no tabs open -->
         <div v-if="editorStore.tabs.length === 0" class="workspace-empty">

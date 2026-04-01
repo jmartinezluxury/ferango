@@ -290,6 +290,19 @@ export const useEditorStore = defineStore('editor', () => {
     allScripts.value = await listScripts()
   }
 
+  // ── Tab connection context ────────────────────────────────────────────────
+
+  /** Called when the user selects a connection/db from the tree — syncs to the active tab */
+  function updateActiveTabContext(connId: string, dbName: string, collectionName: string) {
+    const tab = activeTab()
+    if (!tab) return
+    tab.connId = connId
+    tab.dbName = dbName
+    tab.collectionName = collectionName
+    triggerTabsUpdate()
+    _persistTabs()
+  }
+
   // ── Results ───────────────────────────────────────────────────────────────
 
   function _saveConnContext(tab: Tab) {
@@ -394,6 +407,7 @@ export const useEditorStore = defineStore('editor', () => {
     setResults,
     setTabContent,
     saveTabAt,
+    updateActiveTabContext,
     currentPage,
     canPaginate,
     paginate,
