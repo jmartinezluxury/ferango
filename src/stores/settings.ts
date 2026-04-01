@@ -26,6 +26,14 @@ export const useSettingsStore = defineStore('settings', () => {
 
   function applyTheme(t: string) {
     document.documentElement.setAttribute('data-theme', t)
+    // shadcn-vue uses .dark/.light classes for Tailwind dark mode
+    if (t === 'dark') {
+      document.documentElement.classList.add('dark')
+      document.documentElement.classList.remove('light')
+    } else {
+      document.documentElement.classList.add('light')
+      document.documentElement.classList.remove('dark')
+    }
   }
 
   function applyFontSize(size: number) {

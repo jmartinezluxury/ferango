@@ -8,6 +8,14 @@ import ConnectionTree from './components/ConnectionTree.vue'
 import ScriptBrowser from './components/ScriptBrowser.vue'
 import QueryEditor from './components/QueryEditor.vue'
 import ResultViewer from './components/ResultViewer.vue'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from './components/ui/dialog'
+import { Button } from './components/ui/button'
+import { Switch } from './components/ui/switch'
+import { Label } from './components/ui/label'
+import { Input } from './components/ui/input'
+import { Separator } from './components/ui/separator'
+import { Badge } from './components/ui/badge'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
 
 const connStore = useConnectionsStore()
 const editorStore = useEditorStore()
@@ -110,58 +118,78 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="app-layout">
-    <div class="toolbar">
-      <span class="app-brand"><span class="brand-fer">Fer</span><span class="brand-ango">ango</span></span>
-      <div class="toolbar-sep" />
-      <span class="breadcrumb">
-        <span v-if="activeTabConnName" class="bc-item">{{ activeTabConnName }}</span>
-        <template v-if="activeTabDb">
-          <span class="bc-sep">›</span>
-          <span class="bc-item bc-db">{{ activeTabDb }}</span>
-        </template>
-        <span v-if="!activeTabConnName" class="bc-empty">No connection selected</span>
+  <div class="flex flex-col h-screen overflow-hidden">
+    <!-- Toolbar -->
+    <div class="h-[38px] bg-sidebar border-b border-border flex items-center px-3 gap-2 shrink-0 select-none" style="-webkit-app-region: drag">
+      <span class="text-[13px] font-extrabold tracking-tight" style="-webkit-app-region: no-drag; filter: drop-shadow(0 0 6px rgba(247,148,29,0.4))">
+        <span class="text-white">Fer</span><span class="text-primary">ango</span>
       </span>
-      <span class="toolbar-spacer" />
-      <button class="btn-icon toolbar-btn" title="Keyboard shortcuts" @click="shortcutsOpen = true">?</button>
-      <button class="btn-icon toolbar-btn" title="Settings" @click="settingsOpen = true">⚙</button>
+      <div class="w-px h-4 bg-border" />
+      <span class="flex items-center gap-1.5 text-xs" style="-webkit-app-region: no-drag">
+        <span v-if="activeTabConnName" class="text-muted-foreground">{{ activeTabConnName }}</span>
+        <template v-if="activeTabDb">
+          <span class="text-muted-foreground/50">›</span>
+          <span class="text-ferango-blue">{{ activeTabDb }}</span>
+        </template>
+        <span v-if="!activeTabConnName" class="text-muted-foreground italic">No connection selected</span>
+      </span>
+      <span class="flex-1" />
+      <Button variant="ghost" size="icon" class="h-7 w-7 text-muted-foreground" style="-webkit-app-region: no-drag" title="Keyboard shortcuts" @click="shortcutsOpen = true">
+        <span class="text-sm">?</span>
+      </Button>
+      <Button variant="ghost" size="icon" class="h-7 w-7 text-muted-foreground" style="-webkit-app-region: no-drag" title="Settings" @click="settingsOpen = true">
+        <span class="text-sm">⚙</span>
+      </Button>
     </div>
 
-    <div class="main-layout">
-      <div class="sidebar" :style="{ width: sidebarW + 'px' }">
+    <div class="flex flex-1 overflow-hidden">
+      <!-- Sidebar -->
+      <div class="flex flex-col bg-sidebar overflow-hidden shrink-0 min-w-[180px]" :style="{ width: sidebarW + 'px' }">
         <ConnectionTree />
-        <div class="sidebar-divider" />
+        <Separator />
         <ScriptBrowser />
       </div>
       <div class="resize-h" @mousedown.prevent="startResizeH" />
-      <div class="main-area">
+
+      <!-- Main area -->
+      <div class="flex-1 flex flex-col overflow-hidden">
         <!-- Tab bar -->
-        <div v-if="editorStore.tabs.length > 0" class="tabs-bar">
-          <div class="tabs-list">
+        <div v-if="editorStore.tabs.length > 0" class="flex items-center bg-sidebar border-b border-border h-[30px] shrink-0 overflow-x-auto overflow-y-hidden">
+          <div class="flex h-full">
             <div
               v-for="(tab, i) in editorStore.tabs"
               :key="tab.script.path"
-              :class="['tab', { active: i === editorStore.activeTabIndex }]"
+              :class="[
+                'flex items-center gap-1.5 px-3 text-[11px] cursor-pointer border-r border-border whitespace-nowrap transition-colors',
+                i === editorStore.activeTabIndex
+                  ? 'bg-background text-foreground border-b-2 border-b-primary'
+                  : 'text-muted-foreground hover:bg-accent'
+              ]"
               @click="editorStore.switchTab(i)"
             >
-              <span class="tab-name">{{ tab.script.name }}{{ tab.modified ? ' ●' : '' }}</span>
-              <button class="tab-close" title="Close" @click.stop="editorStore.closeTab(i)">✕</button>
+              <span class="max-w-[120px] overflow-hidden text-ellipsis">{{ tab.script.name }}{{ tab.modified ? ' ●' : '' }}</span>
+              <button
+                class="text-[10px] rounded px-0.5 opacity-0 hover:opacity-100 hover:bg-accent hover:text-destructive transition-opacity"
+                :class="{ 'opacity-100': i === editorStore.activeTabIndex }"
+                title="Close"
+                @click.stop="editorStore.closeTab(i)"
+              >✕</button>
             </div>
           </div>
         </div>
 
         <!-- Single workspace: one QueryEditor (model-swapped) + per-tab ResultViewers -->
         <template v-if="editorStore.tabs.length > 0">
-          <div class="editor-wrap" :style="{ height: editorH + 'px' }">
+          <div class="shrink-0 overflow-hidden min-h-[80px]" :style="{ height: editorH + 'px' }">
             <QueryEditor />
           </div>
           <div class="resize-v" @mousedown.prevent="startResizeV" />
-          <div class="viewer-wrap">
+          <div class="flex-1 overflow-hidden">
             <div
               v-for="(tab, i) in editorStore.tabs"
               :key="tab.script.path"
               v-show="i === editorStore.activeTabIndex"
-              style="height: 100%"
+              class="h-full"
             >
               <ResultViewer :tabIndex="i" />
             </div>
@@ -169,155 +197,162 @@ onMounted(async () => {
         </template>
 
         <!-- Empty state when no tabs open -->
-        <div v-if="editorStore.tabs.length === 0" class="workspace-empty">
+        <div v-if="editorStore.tabs.length === 0" class="flex-1 flex items-center justify-center text-muted-foreground text-xs">
           <span>Open a script or select a collection to get started</span>
         </div>
       </div>
     </div>
 
-    <div class="status-bar">
+    <!-- Status bar -->
+    <div class="h-6 bg-sidebar border-t border-border flex items-center px-2.5 gap-1.5 text-[11px] text-muted-foreground shrink-0">
       <template v-if="editorStore.result">
-        <span :class="editorStore.result.success ? 'status-ok' : 'status-err'">
+        <span :class="editorStore.result.success ? 'text-ferango-green' : 'text-ferango-red'">
           {{ editorStore.result.success ? `${editorStore.result.rows} docs` : 'Error' }}
         </span>
-        <span class="status-sep"> · </span>
+        <span class="text-muted-foreground/50"> · </span>
         <span>{{ editorStore.result.elapsed_ms }}ms</span>
       </template>
-      <span v-else class="status-idle">Ready</span>
-      <span class="status-spacer" />
-      <span class="status-dir">{{ editorStore.scriptsDir }}</span>
+      <span v-else class="text-muted-foreground/50">Ready</span>
+      <span class="flex-1" />
+      <span class="text-[10px] font-mono text-muted-foreground/50">{{ editorStore.scriptsDir }}</span>
     </div>
   </div>
 
-  <!-- Settings modal -->
-  <div v-if="settingsOpen" class="modal-overlay" @click.self="settingsOpen = false">
-    <div class="modal settings-modal">
-      <div class="modal-header">
-        <span class="modal-title">Settings</span>
-        <button class="btn-icon" @click="settingsOpen = false">✕</button>
-      </div>
+  <!-- Settings modal (shadcn Dialog) -->
+  <Dialog :open="settingsOpen" @update:open="settingsOpen = $event">
+    <DialogContent class="sm:max-w-[400px] bg-card border-border">
+      <DialogHeader>
+        <DialogTitle class="text-sm font-semibold">Settings</DialogTitle>
+      </DialogHeader>
 
-      <div class="settings-section">
-        <div class="settings-label">Theme</div>
-        <div class="theme-row">
-          <button
-            :class="['theme-btn', { active: settingsStore.theme === 'dark' }]"
-            @click="settingsStore.setTheme('dark')"
-          >Dark</button>
-          <button
-            :class="['theme-btn', { active: settingsStore.theme === 'light' }]"
-            @click="settingsStore.setTheme('light')"
-          >Light</button>
-        </div>
-      </div>
-
-      <div class="settings-section">
-        <div class="settings-label">Editor font size</div>
-        <div class="font-size-row">
-          <button class="btn-icon font-btn" :disabled="settingsStore.fontSize <= 10" @click="settingsStore.setFontSize(settingsStore.fontSize - 1)">−</button>
-          <span class="font-size-val">{{ settingsStore.fontSize }}px</span>
-          <button class="btn-icon font-btn" :disabled="settingsStore.fontSize >= 24" @click="settingsStore.setFontSize(settingsStore.fontSize + 1)">+</button>
-        </div>
-      </div>
-
-      <div class="settings-divider" />
-
-      <div class="settings-section">
-        <div class="settings-label">AI Autocomplete</div>
-        <label class="ai-toggle-row">
-          <input type="checkbox" :checked="settingsStore.aiEnabled" @change="settingsStore.setAiEnabled(($event.target as HTMLInputElement).checked)" />
-          <span>{{ settingsStore.aiEnabled ? 'Enabled' : 'Disabled' }}</span>
-        </label>
-      </div>
-
-      <template v-if="settingsStore.aiEnabled">
-        <div class="settings-section">
-          <div class="settings-label">Provider</div>
-          <div class="provider-row">
-            <button
-              v-for="p in (['ollama', 'openai', 'claude'] as const)"
-              :key="p"
-              :class="['theme-btn', { active: settingsStore.aiProvider === p }]"
-              @click="settingsStore.setAiProvider(p)"
-            >{{ p === 'ollama' ? 'Ollama' : p === 'openai' ? 'OpenAI' : 'Claude' }}</button>
+      <div class="space-y-5">
+        <!-- Theme -->
+        <div class="space-y-2">
+          <Label class="text-[10px] uppercase tracking-wider text-muted-foreground">Theme</Label>
+          <div class="flex gap-2">
+            <Button
+              v-for="t in (['dark', 'light'] as const)" :key="t"
+              :variant="settingsStore.theme === t ? 'default' : 'outline'"
+              size="sm" class="flex-1 text-xs capitalize"
+              @click="settingsStore.setTheme(t)"
+            >{{ t }}</Button>
           </div>
         </div>
 
-        <div class="settings-section">
-          <div class="settings-label">Endpoint</div>
-          <input
-            class="settings-input"
-            :value="settingsStore.aiEndpoint"
-            @change="settingsStore.setAiEndpoint(($event.target as HTMLInputElement).value)"
-            placeholder="http://localhost:11434"
-          />
-        </div>
-
-        <div class="settings-section">
-          <div class="settings-label">Model</div>
-          <input
-            class="settings-input"
-            :value="settingsStore.aiModel"
-            @change="settingsStore.setAiModel(($event.target as HTMLInputElement).value)"
-            placeholder="codellama:7b"
-          />
-        </div>
-
-        <div v-if="settingsStore.aiProvider !== 'ollama'" class="settings-section">
-          <div class="settings-label">
-            API Key
-            <span v-if="aiKeyExists" class="key-saved">saved</span>
+        <!-- Font size -->
+        <div class="space-y-2">
+          <Label class="text-[10px] uppercase tracking-wider text-muted-foreground">Editor font size</Label>
+          <div class="flex items-center gap-3">
+            <Button variant="outline" size="icon" class="h-7 w-7 text-base" :disabled="settingsStore.fontSize <= 10" @click="settingsStore.setFontSize(settingsStore.fontSize - 1)">-</Button>
+            <span class="text-sm font-mono min-w-[36px] text-center">{{ settingsStore.fontSize }}px</span>
+            <Button variant="outline" size="icon" class="h-7 w-7 text-base" :disabled="settingsStore.fontSize >= 24" @click="settingsStore.setFontSize(settingsStore.fontSize + 1)">+</Button>
           </div>
-          <div class="api-key-row">
-            <input
-              class="settings-input"
-              type="password"
-              v-model="aiApiKey"
-              :placeholder="aiKeyExists ? '••••••••  (update key)' : 'Enter API key'"
+        </div>
+
+        <Separator />
+
+        <!-- AI Autocomplete -->
+        <div class="flex items-center justify-between">
+          <Label class="text-[10px] uppercase tracking-wider text-muted-foreground">AI Autocomplete</Label>
+          <Switch :checked="settingsStore.aiEnabled" @update:checked="settingsStore.setAiEnabled" />
+        </div>
+
+        <template v-if="settingsStore.aiEnabled">
+          <!-- Provider -->
+          <div class="space-y-2">
+            <Label class="text-[10px] uppercase tracking-wider text-muted-foreground">Provider</Label>
+            <Select :model-value="settingsStore.aiProvider" @update:model-value="settingsStore.setAiProvider($event as 'ollama' | 'openai' | 'claude')">
+              <SelectTrigger class="h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ollama">Ollama</SelectItem>
+                <SelectItem value="openai">OpenAI</SelectItem>
+                <SelectItem value="claude">Claude</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <!-- Endpoint -->
+          <div class="space-y-2">
+            <Label class="text-[10px] uppercase tracking-wider text-muted-foreground">Endpoint</Label>
+            <Input
+              class="h-8 text-xs font-mono"
+              :model-value="settingsStore.aiEndpoint"
+              @change="settingsStore.setAiEndpoint(($event.target as HTMLInputElement).value)"
+              placeholder="http://localhost:11434"
             />
-            <button class="btn-ghost save-key-btn" @click="saveApiKey" :disabled="!aiApiKey.trim()">Save</button>
           </div>
-        </div>
 
-        <div class="settings-section">
-          <button
-            class="btn-ghost test-btn"
+          <!-- Model -->
+          <div class="space-y-2">
+            <Label class="text-[10px] uppercase tracking-wider text-muted-foreground">Model</Label>
+            <Input
+              class="h-8 text-xs font-mono"
+              :model-value="settingsStore.aiModel"
+              @change="settingsStore.setAiModel(($event.target as HTMLInputElement).value)"
+              placeholder="codellama:7b"
+            />
+          </div>
+
+          <!-- API Key -->
+          <div v-if="settingsStore.aiProvider !== 'ollama'" class="space-y-2">
+            <Label class="text-[10px] uppercase tracking-wider text-muted-foreground">
+              API Key
+              <Badge v-if="aiKeyExists" variant="secondary" class="ml-2 text-[9px] text-green-500">saved</Badge>
+            </Label>
+            <div class="flex gap-2">
+              <Input
+                class="h-8 text-xs font-mono flex-1"
+                type="password"
+                v-model="aiApiKey"
+                :placeholder="aiKeyExists ? '••••••••  (update key)' : 'Enter API key'"
+              />
+              <Button variant="outline" size="sm" class="text-xs shrink-0" @click="saveApiKey" :disabled="!aiApiKey.trim()">Save</Button>
+            </div>
+          </div>
+
+          <!-- Test connection -->
+          <Button
+            variant="outline" size="sm" class="text-xs w-full"
             :disabled="aiHealthStatus === 'checking'"
             @click="testAiConnection"
           >
-            {{ aiHealthStatus === 'checking' ? 'Checking…' : 'Test connection' }}
-            <span v-if="aiHealthStatus === 'ok'" class="health-ok">OK</span>
-            <span v-if="aiHealthStatus === 'fail'" class="health-fail">Failed</span>
-          </button>
-        </div>
-      </template>
-    </div>
-  </div>
-
-  <!-- Shortcuts modal -->
-  <div v-if="shortcutsOpen" class="modal-overlay" @click.self="shortcutsOpen = false">
-    <div class="modal shortcuts-modal">
-      <div class="modal-header">
-        <span class="modal-title">Keyboard shortcuts</span>
-        <button class="btn-icon" @click="shortcutsOpen = false">✕</button>
+            {{ aiHealthStatus === 'checking' ? 'Checking...' : 'Test connection' }}
+            <Badge v-if="aiHealthStatus === 'ok'" variant="secondary" class="ml-2 text-green-500 text-[9px]">OK</Badge>
+            <Badge v-if="aiHealthStatus === 'fail'" variant="destructive" class="ml-2 text-[9px]">Failed</Badge>
+          </Button>
+        </template>
       </div>
-      <table class="shortcuts-table">
-        <thead><tr><th>Shortcut</th><th>Action</th></tr></thead>
-        <tbody>
-          <tr><td class="shortcut-key">Ctrl+Enter</td><td>Run statement at cursor</td></tr>
-          <tr><td class="shortcut-key">Select + Ctrl+Enter</td><td>Run selected statements</td></tr>
-          <tr><td class="shortcut-key">Run all button</td><td>Run all statements in file</td></tr>
-          <tr><td class="shortcut-key">Shift+Alt+F</td><td>Format document</td></tr>
-          <tr><td class="shortcut-key">Ctrl+S</td><td>Save script</td></tr>
-          <tr><td class="shortcut-key">Ctrl+Shift+S</td><td>Save all scripts</td></tr>
-          <tr><td class="shortcut-key">Ctrl+F</td><td>Find in editor</td></tr>
-          <tr><td class="shortcut-key">Ctrl+Z</td><td>Undo</td></tr>
-          <tr><td class="shortcut-key">Ctrl+Shift+Z</td><td>Redo</td></tr>
-          <tr><td class="shortcut-key">Ctrl+/</td><td>Toggle line comment</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
+    </DialogContent>
+  </Dialog>
+
+  <!-- Shortcuts modal (shadcn Dialog) -->
+  <Dialog :open="shortcutsOpen" @update:open="shortcutsOpen = $event">
+    <DialogContent class="sm:max-w-[440px] bg-card border-border">
+      <DialogHeader>
+        <DialogTitle class="text-sm font-semibold">Keyboard shortcuts</DialogTitle>
+      </DialogHeader>
+
+      <div class="space-y-1">
+        <div v-for="s in [
+          { key: 'Ctrl+Enter', action: 'Run statement at cursor' },
+          { key: 'Select + Ctrl+Enter', action: 'Run selected statements' },
+          { key: 'Run all button', action: 'Run all statements in file' },
+          { key: 'Shift+Alt+F', action: 'Format document' },
+          { key: 'Ctrl+S', action: 'Save script' },
+          { key: 'Ctrl+Shift+S', action: 'Save all scripts' },
+          { key: 'Ctrl+F', action: 'Find in editor' },
+          { key: 'Ctrl+Z', action: 'Undo' },
+          { key: 'Ctrl+Shift+Z', action: 'Redo' },
+          { key: 'Ctrl+/', action: 'Toggle line comment' },
+        ]" :key="s.key" class="flex items-center justify-between py-1.5 text-xs">
+          <span class="text-muted-foreground">{{ s.action }}</span>
+          <kbd class="font-mono text-[11px] text-primary bg-secondary px-1.5 py-0.5 rounded">{{ s.key }}</kbd>
+        </div>
+      </div>
+    </DialogContent>
+  </Dialog>
 
   <div class="toast-container">
     <div v-for="t in toasts" :key="t.id" :class="['toast', t.type]">{{ t.msg }}</div>
@@ -325,133 +360,5 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.app-layout { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-.toolbar {
-  height: var(--toolbar-h); background: var(--bg-sidebar);
-  border-bottom: 1px solid var(--border);
-  display: flex; align-items: center; padding: 0 12px; gap: 8px; flex-shrink: 0;
-  -webkit-app-region: drag; user-select: none;
-}
-.toolbar * { -webkit-app-region: no-drag; }
-.app-brand {
-  font-size: 13px;
-  font-weight: 800;
-  letter-spacing: -0.3px;
-  filter: drop-shadow(0 0 6px rgba(247,148,29,0.4));
-}
-.brand-fer  { color: #ffffff; }
-.brand-ango { color: #f7941d; }
-.toolbar-sep { width: 1px; height: 16px; background: var(--border); }
-.breadcrumb { display: flex; align-items: center; gap: 5px; font-size: 12px; }
-.bc-item  { color: var(--text-dim); }
-.bc-db    { color: var(--blue); }
-.bc-col   { color: var(--accent); }
-.bc-sep   { color: var(--text-muted); }
-.bc-empty { color: var(--text-muted); font-style: italic; }
-.main-layout { display: flex; flex: 1; overflow: hidden; }
-.sidebar {
-  display: flex; flex-direction: column; background: var(--bg-sidebar);
-  overflow: hidden; flex-shrink: 0; min-width: 180px;
-}
-.sidebar-divider { height: 1px; background: var(--border); flex-shrink: 0; }
-.main-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-
-/* Tab bar */
-.tabs-bar {
-  display: flex; align-items: center;
-  background: var(--bg-sidebar); border-bottom: 1px solid var(--border);
-  height: 30px; flex-shrink: 0; overflow-x: auto; overflow-y: hidden;
-}
-.tabs-list { display: flex; height: 100%; }
-.tab {
-  display: flex; align-items: center; gap: 6px;
-  padding: 0 10px; font-size: 11px; cursor: pointer;
-  border-right: 1px solid var(--border); white-space: nowrap;
-  color: var(--text-dim); background: transparent;
-  transition: background 0.1s;
-}
-.tab:hover { background: var(--bg-hover); }
-.tab.active { background: var(--bg); color: var(--text); border-bottom: 2px solid var(--accent); }
-.tab-name { max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
-.tab-close {
-  font-size: 10px; background: transparent; color: var(--text-muted);
-  border-radius: 2px; padding: 1px 3px;
-  opacity: 0; transition: opacity 0.1s;
-}
-.tab:hover .tab-close { opacity: 1; }
-.tab-close:hover { background: var(--bg-hover); color: var(--red); }
-
-/* Workspace instances */
-.workspace { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
-.workspace-empty {
-  flex: 1; display: flex; align-items: center; justify-content: center;
-  color: var(--text-muted); font-size: 12px;
-}
-.editor-wrap { flex-shrink: 0; overflow: hidden; min-height: 80px; }
-.viewer-wrap { flex: 1; overflow: hidden; }
-.status-bar {
-  height: var(--status-h); background: var(--bg-sidebar);
-  border-top: 1px solid var(--border);
-  display: flex; align-items: center; padding: 0 10px; gap: 6px;
-  font-size: 11px; color: var(--text-dim); flex-shrink: 0;
-}
-.status-ok  { color: var(--green); }
-.status-err { color: var(--red); }
-.status-sep { color: var(--text-muted); }
-.status-spacer { flex: 1; }
-.status-idle { color: var(--text-muted); }
-.status-dir { color: var(--text-muted); font-size: 10px; font-family: var(--font-mono); }
-
-/* Toolbar right side */
-.toolbar-spacer { flex: 1; }
-.toolbar-btn { font-size: 16px; padding: 2px 8px; font-weight: 500; }
-
-/* Settings modal */
-.settings-modal { min-width: 300px; max-width: 360px; }
-.settings-section { margin-bottom: 20px; }
-.settings-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
-.theme-row { display: flex; gap: 8px; }
-.theme-btn {
-  flex: 1; padding: 6px; font-size: 12px;
-  background: var(--bg-input); color: var(--text-dim);
-  border: 1px solid var(--border); border-radius: var(--radius);
-}
-.theme-btn:hover { border-color: var(--accent); color: var(--text); }
-.theme-btn.active { background: var(--accent); color: #0d1b2a; border-color: var(--accent); font-weight: 600; }
-.font-size-row { display: flex; align-items: center; gap: 12px; }
-.font-btn { font-size: 16px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border); }
-.font-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-.font-size-val { font-size: 13px; color: var(--text); min-width: 36px; text-align: center; font-family: var(--font-mono); }
-
-/* AI settings */
-.settings-divider { height: 1px; background: var(--border); margin: 16px 0; }
-.ai-toggle-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-dim); cursor: pointer; }
-.ai-toggle-row input[type="checkbox"] { accent-color: var(--accent); width: 14px; height: 14px; }
-.provider-row { display: flex; gap: 6px; }
-.settings-input {
-  width: 100%; padding: 6px 8px; font-size: 12px;
-  background: var(--bg-input); color: var(--text);
-  border: 1px solid var(--border); border-radius: var(--radius);
-  font-family: var(--font-mono);
-}
-.settings-input:focus { border-color: var(--accent); outline: none; }
-.api-key-row { display: flex; gap: 6px; }
-.api-key-row .settings-input { flex: 1; }
-.save-key-btn { font-size: 11px; padding: 5px 10px; white-space: nowrap; }
-.save-key-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.key-saved { color: var(--green); font-size: 10px; font-weight: 600; margin-left: 6px; text-transform: none; letter-spacing: 0; }
-.test-btn { font-size: 11px; display: flex; align-items: center; gap: 6px; }
-.health-ok { color: var(--green); font-weight: 600; }
-.health-fail { color: var(--red); font-weight: 600; }
-
-/* Shortcuts modal */
-.shortcuts-modal { min-width: 380px; }
-.shortcuts-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.shortcuts-table thead tr { border-bottom: 1px solid var(--border); }
-.shortcuts-table th { text-align: left; font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; padding: 0 0 8px; font-weight: 600; }
-.shortcuts-table td { padding: 5px 0; color: var(--text-dim); }
-.shortcut-key {
-  font-family: var(--font-mono); font-size: 11px;
-  color: var(--accent); white-space: nowrap; padding-right: 20px;
-}
+/* Only non-Tailwind styles that can't be expressed as utility classes */
 </style>
