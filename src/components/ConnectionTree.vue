@@ -4,6 +4,7 @@ import { open as openFilePicker } from '@tauri-apps/plugin-dialog'
 import { useConnectionsStore } from '../stores/connections'
 import { useEditorStore } from '../stores/editor'
 import type { ConnectionConfig } from '../lib/tauri'
+import { Server, Database, Table2, FolderOpen, Plus, Download, Target, ChevronRight, ChevronDown, Pencil, Trash2 } from 'lucide-vue-next'
 import {
   createCollection, dropCollectionCmd, dropDatabaseCmd, parseCompassFile,
   getCollectionStats, inferSchema, listIndexesCmd, executeQuery,
@@ -457,9 +458,9 @@ onBeforeUnmount(() => document.removeEventListener('click', closeCtxMenu))
   <div class="tree-root">
     <div class="tree-header">
       <span class="tree-title">Connections</span>
-      <button class="btn-icon" title="Focus on active tab's DB" @click="focusActiveTabDb">⊙</button>
-      <button class="btn-icon" title="Import from Compass" @click="openImport">↓</button>
-      <button class="btn-icon" title="New connection" @click="openNew">＋</button>
+      <button class="btn-icon" title="Focus on active tab's DB" @click="focusActiveTabDb"><Target class="h-3.5 w-3.5" /></button>
+      <button class="btn-icon" title="Import from Compass" @click="openImport"><Download class="h-3.5 w-3.5" /></button>
+      <button class="btn-icon" title="New connection" @click="openNew"><Plus class="h-3.5 w-3.5" /></button>
     </div>
 
     <div v-if="connStore.connections.length" class="tree-search">
@@ -477,8 +478,8 @@ onBeforeUnmount(() => document.removeEventListener('click', closeCtxMenu))
       <template v-for="(conns, g) in groupedConnections.groups" :key="String(g)">
         <template v-if="!q || conns.some(connMatchesFilter)">
           <div class="tree-node tree-group" @click="toggleGroup(String(g))">
-            <span class="tree-caret">{{ expandedGroups.has(String(g)) ? '▾' : '▸' }}</span>
-            <span class="tree-icon group-icon">▣</span>
+            <component :is="expandedGroups.has(String(g)) ? ChevronDown : ChevronRight" class="h-3 w-3 shrink-0 text-muted-foreground" />
+            <FolderOpen class="h-3.5 w-3.5 text-muted-foreground shrink-0" />
             <span class="tree-label group-label">{{ g }}</span>
             <span class="tree-badge">{{ conns.length }}</span>
           </div>
@@ -486,12 +487,12 @@ onBeforeUnmount(() => document.removeEventListener('click', closeCtxMenu))
             <template v-for="conn in conns" :key="conn.id">
               <div v-if="connMatchesFilter(conn)" class="tree-section" style="padding-left:12px">
                 <div class="tree-node tree-conn" :data-conn-id="conn.id" :class="{ active: connStore.activeConn?.id === conn.id }" @click="onToggleConn(conn)">
-                  <span class="tree-caret">{{ connStore.tree[conn.id]?.expanded ? '▾' : '▸' }}</span>
-                  <span class="tree-icon">⬡</span>
+                  <component :is="connStore.tree[conn.id]?.expanded ? ChevronDown : ChevronRight" class="h-3 w-3 shrink-0 text-muted-foreground" />
+                  <Server class="h-3.5 w-3.5 text-primary shrink-0" />
                   <span class="tree-label">{{ conn.name }}</span>
                   <span class="tree-actions">
-                    <button class="btn-icon tree-action" title="Edit" @click.stop="openEdit(conn)">✎</button>
-                    <button class="btn-icon tree-action" title="Delete" @click.stop="remove(conn.id, $event)">✕</button>
+                    <button class="btn-icon tree-action" title="Edit" @click.stop="openEdit(conn)"><Pencil class="h-3 w-3" /></button>
+                    <button class="btn-icon tree-action" title="Delete" @click.stop="remove(conn.id, $event)"><Trash2 class="h-3 w-3" /></button>
                   </span>
                 </div>
                 <template v-if="connStore.tree[conn.id]?.expanded">
@@ -501,14 +502,14 @@ onBeforeUnmount(() => document.removeEventListener('click', closeCtxMenu))
                   </div>
                   <div v-for="db in filterDbs(connStore.tree[conn.id].databases)" :key="db" class="tree-section">
                     <div class="tree-node tree-db" :class="{ active: connStore.activeDb === db && connStore.activeConn?.id === conn.id }" style="padding-left: 32px" @click="onToggleDb(conn, db)" @contextmenu="openCtxMenu($event, 'db', conn, db, '')">
-                      <span class="tree-caret">{{ connStore.tree[conn.id]?.expandedDbs[db] ? '▾' : '▸' }}</span>
-                      <span class="tree-icon db-icon">◈</span>
+                      <component :is="connStore.tree[conn.id]?.expandedDbs[db] ? ChevronDown : ChevronRight" class="h-3 w-3 shrink-0 text-muted-foreground" />
+                      <Database class="h-3.5 w-3.5 text-ferango-blue shrink-0" />
                       <span class="tree-label">{{ db }}</span>
                     </div>
                     <template v-if="connStore.tree[conn.id]?.expandedDbs[db]">
                       <div v-if="!filterCols(connStore.tree[conn.id].expandedDbs[db]).length" class="tree-node tree-empty-msg" style="padding-left:60px">No collections</div>
                       <div v-for="col in filterCols(connStore.tree[conn.id].expandedDbs[db])" :key="col" class="tree-node tree-col" :class="{ active: connStore.activeCollection === col && connStore.activeDb === db && connStore.activeConn?.id === conn.id }" style="padding-left: 52px" @click="onSelectCol(conn, db, col)" @contextmenu="openCtxMenu($event, 'col', conn, db, col)">
-                        <span class="tree-icon col-icon">▤</span>
+                        <Table2 class="h-3.5 w-3.5 text-primary shrink-0" />
                         <span class="tree-label">{{ col }}</span>
                       </div>
                     </template>
@@ -524,8 +525,8 @@ onBeforeUnmount(() => document.removeEventListener('click', closeCtxMenu))
       <template v-for="conn in groupedConnections.ungrouped" :key="conn.id">
         <div v-if="connMatchesFilter(conn)" class="tree-section">
           <div class="tree-node tree-conn" :data-conn-id="conn.id" :class="{ active: connStore.activeConn?.id === conn.id }" @click="onToggleConn(conn)">
-            <span class="tree-caret">{{ connStore.tree[conn.id]?.expanded ? '▾' : '▸' }}</span>
-            <span class="tree-icon">⬡</span>
+            <component :is="connStore.tree[conn.id]?.expanded ? ChevronDown : ChevronRight" class="h-3 w-3 shrink-0 text-muted-foreground" />
+            <Server class="h-3.5 w-3.5 text-primary shrink-0" />
             <span class="tree-label">{{ conn.name }}</span>
             <span class="tree-actions">
               <button class="btn-icon tree-action" title="Edit" @click.stop="openEdit(conn)">✎</button>
@@ -539,14 +540,14 @@ onBeforeUnmount(() => document.removeEventListener('click', closeCtxMenu))
             </div>
             <div v-for="db in filterDbs(connStore.tree[conn.id].databases)" :key="db" class="tree-section">
               <div class="tree-node tree-db" :class="{ active: connStore.activeDb === db && connStore.activeConn?.id === conn.id }" style="padding-left: 20px" @click="onToggleDb(conn, db)" @contextmenu="openCtxMenu($event, 'db', conn, db, '')">
-                <span class="tree-caret">{{ connStore.tree[conn.id]?.expandedDbs[db] ? '▾' : '▸' }}</span>
-                <span class="tree-icon db-icon">◈</span>
+                <component :is="connStore.tree[conn.id]?.expandedDbs[db] ? ChevronDown : ChevronRight" class="h-3 w-3 shrink-0 text-muted-foreground" />
+                <Database class="h-3.5 w-3.5 text-ferango-blue shrink-0" />
                 <span class="tree-label">{{ db }}</span>
               </div>
               <template v-if="connStore.tree[conn.id]?.expandedDbs[db]">
                 <div v-if="!filterCols(connStore.tree[conn.id].expandedDbs[db]).length" class="tree-node tree-empty-msg" style="padding-left:48px">No collections</div>
                 <div v-for="col in filterCols(connStore.tree[conn.id].expandedDbs[db])" :key="col" class="tree-node tree-col" :class="{ active: connStore.activeCollection === col && connStore.activeDb === db && connStore.activeConn?.id === conn.id }" style="padding-left: 40px" @click="onSelectCol(conn, db, col)" @contextmenu="openCtxMenu($event, 'col', conn, db, col)">
-                  <span class="tree-icon col-icon">▤</span>
+                  <Table2 class="h-3.5 w-3.5 text-primary shrink-0" />
                   <span class="tree-label">{{ col }}</span>
                 </div>
               </template>

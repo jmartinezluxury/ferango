@@ -16,6 +16,7 @@ import { Input } from './components/ui/input'
 import { Separator } from './components/ui/separator'
 import { Badge } from './components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
+import { Settings, Keyboard } from 'lucide-vue-next'
 
 const connStore = useConnectionsStore()
 const editorStore = useEditorStore()
@@ -125,7 +126,7 @@ onMounted(async () => {
         <span class="text-white">Fer</span><span class="text-primary">ango</span>
       </span>
       <div class="w-px h-4 bg-border" />
-      <span class="flex items-center gap-1.5 text-xs" style="-webkit-app-region: no-drag">
+      <span class="flex items-center gap-1.5 text-[13px]" style="-webkit-app-region: no-drag">
         <span v-if="activeTabConnName" class="text-muted-foreground">{{ activeTabConnName }}</span>
         <template v-if="activeTabDb">
           <span class="text-muted-foreground/50">›</span>
@@ -134,11 +135,11 @@ onMounted(async () => {
         <span v-if="!activeTabConnName" class="text-muted-foreground italic">No connection selected</span>
       </span>
       <span class="flex-1" />
-      <Button variant="ghost" size="icon" class="h-7 w-7 text-muted-foreground" style="-webkit-app-region: no-drag" title="Keyboard shortcuts" @click="shortcutsOpen = true">
-        <span class="text-sm">?</span>
+      <Button variant="ghost" size="icon" class="h-7 w-7 text-muted-foreground hover:text-foreground" style="-webkit-app-region: no-drag" title="Keyboard shortcuts" @click="shortcutsOpen = true">
+        <Keyboard class="h-4 w-4" />
       </Button>
-      <Button variant="ghost" size="icon" class="h-7 w-7 text-muted-foreground" style="-webkit-app-region: no-drag" title="Settings" @click="settingsOpen = true">
-        <span class="text-sm">⚙</span>
+      <Button variant="ghost" size="icon" class="h-7 w-7 text-muted-foreground hover:text-foreground" style="-webkit-app-region: no-drag" title="Settings" @click="settingsOpen = true">
+        <Settings class="h-4 w-4" />
       </Button>
     </div>
 
@@ -160,7 +161,7 @@ onMounted(async () => {
               v-for="(tab, i) in editorStore.tabs"
               :key="tab.script.path"
               :class="[
-                'flex items-center gap-1.5 px-3 text-[11px] cursor-pointer border-r border-border whitespace-nowrap transition-colors',
+                'flex items-center gap-1.5 px-3 text-xs cursor-pointer border-r border-border whitespace-nowrap transition-colors',
                 i === editorStore.activeTabIndex
                   ? 'bg-background text-foreground border-b-2 border-b-primary'
                   : 'text-muted-foreground hover:bg-accent'
