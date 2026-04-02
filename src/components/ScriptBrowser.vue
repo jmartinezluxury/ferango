@@ -4,6 +4,7 @@ import { useEditorStore } from '../stores/editor'
 import { useConnectionsStore } from '../stores/connections'
 import type { ScriptFile, HistoryEntry } from '../lib/tauri'
 import { listHistory, clearHistory, exportScriptsZip } from '../lib/tauri'
+import { FolderOpen, FileText, Plus, Download, ChevronRight, ChevronDown, Pencil, Trash2, X } from 'lucide-vue-next'
 
 const editorStore = useEditorStore()
 const connStore = useConnectionsStore()
@@ -122,7 +123,7 @@ async function deleteScript(script: ScriptFile, e: Event) {
   } catch (err) { toast(String(err), 'error') }
 }
 
-// ── Export zip ────────────────────────────────────────────────────────────────
+// -- Export zip ----------------------------------------------------------------
 async function exportZip() {
   try {
     const path = await exportScriptsZip()
@@ -130,7 +131,7 @@ async function exportZip() {
   } catch (err) { toast(String(err), 'error') }
 }
 
-// ── History ───────────────────────────────────────────────────────────────────
+// -- History ------------------------------------------------------------------
 const historyOpen = ref(false)
 const historyEntries = ref<HistoryEntry[]>([])
 
@@ -151,7 +152,7 @@ async function doClearHistory() {
 
 async function copyHistoryEntry(entry: HistoryEntry) {
   await navigator.clipboard.writeText(entry.query)
-  toast(`Copied: ${entry.query.length > 40 ? entry.query.slice(0, 40) + '…' : entry.query}`, 'info')
+  toast(`Copied: ${entry.query.length > 40 ? entry.query.slice(0, 40) + '...' : entry.query}`, 'info')
 }
 
 watch(historyOpen, (open) => { if (open) loadHistory() })
@@ -162,12 +163,14 @@ watch(() => connStore.activeConn?.id, () => { if (historyOpen.value) loadHistory
   <div class="scripts-root">
     <div class="scripts-header">
       <span class="scripts-title">Scripts</span>
-      <button class="btn-icon" title="Export all scripts as zip" @click="exportZip">↓</button>
-      <button class="btn-icon" title="New script" @click="newScript">＋</button>
+      <span class="scripts-header-actions">
+        <button class="btn-icon" title="Export all scripts as zip" @click="exportZip"><Download class="h-3.5 w-3.5" /></button>
+        <button class="btn-icon" title="New script" @click="newScript"><Plus class="h-3.5 w-3.5" /></button>
+      </span>
     </div>
 
     <div class="scripts-search">
-      <input v-model="search" placeholder="Search scripts…" />
+      <input v-model="search" placeholder="Search scripts..." />
     </div>
 
     <div class="scripts-body">
@@ -177,8 +180,8 @@ watch(() => connStore.activeConn?.id, () => { if (historyOpen.value) loadHistory
 
       <div v-for="(scripts, folder) in grouped" :key="folder" class="folder-section">
         <div class="folder-row" @click="toggleFolder(folder)">
-          <span class="tree-caret">{{ expandedFolders.has(folder) ? '▾' : '▸' }}</span>
-          <span class="folder-icon">📁</span>
+          <component :is="expandedFolders.has(folder) ? ChevronDown : ChevronRight" class="h-3 w-3 shrink-0 text-muted-foreground" />
+          <FolderOpen class="h-3.5 w-3.5 shrink-0 folder-icon" />
           <span class="folder-name">{{ folder }}</span>
           <span class="folder-count">{{ scripts.length }}</span>
         </div>
@@ -191,7 +194,7 @@ watch(() => connStore.activeConn?.id, () => { if (historyOpen.value) loadHistory
             :class="{ active: editorStore.activeTab()?.script.path === script.path }"
             @click="openScript(script)"
           >
-            <span class="script-icon">📄</span>
+            <FileText class="h-3.5 w-3.5 shrink-0 script-icon" />
             <template v-if="renamingPath === script.path">
               <input
                 v-model="renameVal"
@@ -205,8 +208,8 @@ watch(() => connStore.activeConn?.id, () => { if (historyOpen.value) loadHistory
             </template>
             <span v-else class="script-name">{{ script.name }}</span>
             <span class="script-actions">
-              <button class="btn-icon script-action" title="Rename" @click.stop="startRename(script, $event)">✎</button>
-              <button class="btn-icon script-action danger" title="Delete" @click.stop="deleteScript(script, $event)">✕</button>
+              <button class="btn-icon script-action" title="Rename" @click.stop="startRename(script, $event)"><Pencil class="h-3 w-3" /></button>
+              <button class="btn-icon script-action danger" title="Delete" @click.stop="deleteScript(script, $event)"><Trash2 class="h-3 w-3" /></button>
             </span>
           </div>
         </template>
@@ -216,9 +219,9 @@ watch(() => connStore.activeConn?.id, () => { if (historyOpen.value) loadHistory
     <!-- History section -->
     <div class="history-section">
       <div class="history-header" @click="historyOpen = !historyOpen">
-        <span class="tree-caret">{{ historyOpen ? '▾' : '▸' }}</span>
+        <component :is="historyOpen ? ChevronDown : ChevronRight" class="h-3 w-3 shrink-0 text-muted-foreground" />
         <span class="scripts-title">History</span>
-        <button v-if="historyOpen && historyEntries.length" class="btn-icon" title="Clear history" @click.stop="doClearHistory">✕</button>
+        <button v-if="historyOpen && historyEntries.length" class="btn-icon" title="Clear history" @click.stop="doClearHistory"><X class="h-3 w-3" /></button>
       </div>
       <template v-if="historyOpen">
         <div v-if="!connStore.activeConn" class="history-empty">Connect to a server first</div>
@@ -230,7 +233,7 @@ watch(() => connStore.activeConn?.id, () => { if (historyOpen.value) loadHistory
           :title="entry.query"
           @click="copyHistoryEntry(entry)"
         >
-          <span class="history-query">{{ entry.query.length > 45 ? entry.query.slice(0, 45) + '…' : entry.query }}</span>
+          <span class="history-query">{{ entry.query.length > 45 ? entry.query.slice(0, 45) + '...' : entry.query }}</span>
           <span class="history-meta">{{ entry.db }} · {{ entry.elapsed_ms }}ms</span>
         </div>
       </template>
@@ -247,8 +250,9 @@ watch(() => connStore.activeConn?.id, () => { if (historyOpen.value) loadHistory
   border-bottom: 1px solid var(--border); flex-shrink: 0;
 }
 .scripts-title { user-select: none; }
+.scripts-header-actions { display: flex; gap: 1px; }
 .scripts-search { padding: 4px 6px; flex-shrink: 0; }
-.scripts-search input { font-size: 11px; padding: 3px 6px; }
+.scripts-search input { font-size: 12px; padding: 3px 6px; }
 .scripts-body { flex: 1; overflow-y: auto; padding: 2px 0; }
 .scripts-empty { color: var(--text-muted); font-size: 11px; text-align: center; padding: 16px; }
 
@@ -257,9 +261,8 @@ watch(() => connStore.activeConn?.id, () => { if (historyOpen.value) loadHistory
   padding: 3px 8px; cursor: pointer; user-select: none;
 }
 .folder-row:hover { background: var(--bg-hover); }
-.tree-caret { font-size: 9px; color: var(--text-muted); width: 10px; }
-.folder-icon { font-size: 12px; }
-.folder-name { flex: 1; font-size: 12px; color: var(--text-dim); font-weight: 500; overflow: hidden; text-overflow: ellipsis; }
+.folder-icon { color: var(--text-muted); }
+.folder-name { flex: 1; font-size: 13px; color: var(--text-dim); font-weight: 500; overflow: hidden; text-overflow: ellipsis; }
 .folder-count { font-size: 10px; color: var(--text-muted); }
 
 .script-row {
@@ -268,10 +271,10 @@ watch(() => connStore.activeConn?.id, () => { if (historyOpen.value) loadHistory
 }
 .script-row:hover { background: var(--bg-hover); }
 .script-row.active { background: var(--bg-active); }
-.script-icon { font-size: 11px; flex-shrink: 0; }
-.script-name { flex: 1; font-size: 11px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); }
+.script-icon { color: var(--text-muted); flex-shrink: 0; }
+.script-name { flex: 1; font-size: 12px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); }
 .script-row.active .script-name { color: var(--accent); }
-.rename-input { flex: 1; font-size: 11px; padding: 1px 4px; font-family: var(--font-mono); }
+.rename-input { flex: 1; font-size: 12px; padding: 1px 4px; font-family: var(--font-mono); }
 
 .script-actions { display: none; gap: 1px; }
 .script-row:hover .script-actions { display: flex; }
@@ -291,6 +294,6 @@ watch(() => connStore.activeConn?.id, () => { if (historyOpen.value) loadHistory
   border-bottom: 1px solid var(--border);
 }
 .history-row:hover { background: var(--bg-hover); }
-.history-query { display: block; font-size: 11px; font-family: var(--font-mono); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.history-query { display: block; font-size: 12px; font-family: var(--font-mono); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .history-meta { font-size: 10px; color: var(--text-muted); }
 </style>

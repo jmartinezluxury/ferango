@@ -4,12 +4,14 @@ import { open as openFilePicker } from '@tauri-apps/plugin-dialog'
 import { useConnectionsStore } from '../stores/connections'
 import { useEditorStore } from '../stores/editor'
 import type { ConnectionConfig } from '../lib/tauri'
-import { Server, Database, Table2, FolderOpen, Plus, Download, Target, ChevronRight, ChevronDown, Pencil, Trash2 } from 'lucide-vue-next'
+import { Server, Database, Table2, FolderOpen, Plus, Download, Target, ChevronRight, ChevronDown, Pencil, Trash2, Search, FileText, BarChart3, ListTree, Braces, Copy } from 'lucide-vue-next'
 import {
   createCollection, dropCollectionCmd, dropDatabaseCmd, parseCompassFile,
   getCollectionStats, inferSchema, listIndexesCmd, executeQuery,
 } from '../lib/tauri'
 import type { CollectionStats, SchemaField, IndexInfo } from '../lib/tauri'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
 
 const connStore = useConnectionsStore()
 const editorStore = useEditorStore()
@@ -458,13 +460,15 @@ onBeforeUnmount(() => document.removeEventListener('click', closeCtxMenu))
   <div class="tree-root">
     <div class="tree-header">
       <span class="tree-title">Connections</span>
-      <button class="btn-icon" title="Focus on active tab's DB" @click="focusActiveTabDb"><Target class="h-3.5 w-3.5" /></button>
-      <button class="btn-icon" title="Import from Compass" @click="openImport"><Download class="h-3.5 w-3.5" /></button>
-      <button class="btn-icon" title="New connection" @click="openNew"><Plus class="h-3.5 w-3.5" /></button>
+      <span class="tree-header-actions">
+        <button class="btn-icon" title="Focus on active tab's DB" @click="focusActiveTabDb"><Target class="h-3.5 w-3.5" /></button>
+        <button class="btn-icon" title="Import from Compass" @click="openImport"><Download class="h-3.5 w-3.5" /></button>
+        <button class="btn-icon" title="New connection" @click="openNew"><Plus class="h-3.5 w-3.5" /></button>
+      </span>
     </div>
 
     <div v-if="connStore.connections.length" class="tree-search">
-      <input v-model="treeFilter" placeholder="Filter…" />
+      <input v-model="treeFilter" placeholder="Filter..." />
     </div>
 
     <div class="tree-body">
@@ -497,7 +501,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closeCtxMenu))
                 </div>
                 <template v-if="connStore.tree[conn.id]?.expanded">
                   <div v-if="!connStore.tree[conn.id].databases.length" class="tree-node tree-loading-msg" style="padding-left:40px">
-                    <template v-if="loadingConns.has(conn.id)"><span class="loading-dot" />Loading…</template>
+                    <template v-if="loadingConns.has(conn.id)"><span class="loading-dot" />Loading...</template>
                     <template v-else>No databases</template>
                   </div>
                   <div v-for="db in filterDbs(connStore.tree[conn.id].databases)" :key="db" class="tree-section">
@@ -535,7 +539,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closeCtxMenu))
           </div>
           <template v-if="connStore.tree[conn.id]?.expanded">
             <div v-if="!connStore.tree[conn.id].databases.length" class="tree-node tree-loading-msg" style="padding-left:28px">
-              <template v-if="loadingConns.has(conn.id)"><span class="loading-dot" />Loading…</template>
+              <template v-if="loadingConns.has(conn.id)"><span class="loading-dot" />Loading...</template>
               <template v-else>No databases</template>
             </div>
             <div v-for="db in filterDbs(connStore.tree[conn.id].databases)" :key="db" class="tree-section">
@@ -558,13 +562,12 @@ onBeforeUnmount(() => document.removeEventListener('click', closeCtxMenu))
     </div>
   </div>
 
-  <!-- Connection modal -->
-  <div v-if="showModal" class="modal-overlay" @click.self="showModal = false">
-    <div class="modal">
-      <div class="modal-header">
-        <span class="modal-title">{{ editingConn ? 'Edit Connection' : 'New Connection' }}</span>
-        <button class="btn-icon" @click="showModal = false">✕</button>
-      </div>
+  <!-- Connection form modal -->
+  <Dialog :open="showModal" @update:open="showModal = $event">
+    <DialogContent class="sm:max-w-[520px] bg-card border-border">
+      <DialogHeader>
+        <DialogTitle class="text-sm font-semibold">{{ editingConn ? 'Edit Connection' : 'New Connection' }}</DialogTitle>
+      </DialogHeader>
 
       <div class="form-row">
         <div class="form-group" style="flex:2">
@@ -646,51 +649,73 @@ onBeforeUnmount(() => document.removeEventListener('click', closeCtxMenu))
         </div>
       </template>
 
-      <div class="modal-footer">
-        <button class="btn-ghost" :disabled="testing" @click="testConn">
-          {{ testing ? 'Testing…' : 'Test' }}
-        </button>
-        <button class="btn-ghost" @click="showModal = false">Cancel</button>
-        <button class="btn-primary" :disabled="saving" @click="save">
-          {{ saving ? 'Saving…' : 'Save' }}
-        </button>
+      <div class="flex justify-end gap-2 pt-4 border-t border-border">
+        <Button variant="outline" size="sm" :disabled="testing" @click="testConn">
+          {{ testing ? 'Testing...' : 'Test' }}
+        </Button>
+        <Button variant="outline" size="sm" @click="showModal = false">Cancel</Button>
+        <Button size="sm" :disabled="saving" @click="save">
+          {{ saving ? 'Saving...' : 'Save' }}
+        </Button>
       </div>
-    </div>
-  </div>
+    </DialogContent>
+  </Dialog>
 
   <!-- Context menu -->
   <Teleport to="body">
     <template v-if="ctxMenu.show">
-      <div class="ctx-backdrop" @click.stop="closeCtxMenu" @contextmenu.prevent="closeCtxMenu" />
-      <div class="ctx-menu" :style="{ top: ctxMenu.y + 'px', left: ctxMenu.x + 'px' }" @click.stop>
+      <div class="fixed inset-0 z-50" @click.stop="closeCtxMenu" @contextmenu.prevent="closeCtxMenu" />
+      <div class="fixed z-50 min-w-[180px] rounded-md border border-border bg-popover p-1 shadow-lg" :style="{ top: ctxMenu.y + 'px', left: ctxMenu.x + 'px' }" @click.stop>
 
         <!-- DB-level menu -->
         <template v-if="ctxMenu.type === 'db'">
-          <div class="ctx-header">{{ ctxMenu.db }}</div>
-          <button class="ctx-item" @click="ctxCreateCollection">＋ Create Collection</button>
-          <button class="ctx-item" @click="ctxCopyUri">⎘ Copy URI</button>
-          <div class="ctx-sep" />
-          <button class="ctx-item ctx-danger" @click="ctxDropDatabase">✕ Drop Database</button>
+          <div class="px-2 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide border-b border-border mb-0.5 overflow-hidden text-ellipsis whitespace-nowrap">{{ ctxMenu.db }}</div>
+          <button class="flex items-center gap-2 rounded-sm px-2 py-1.5 text-xs cursor-pointer hover:bg-accent hover:text-accent-foreground w-full text-left" @click="ctxCreateCollection">
+            <Plus class="h-3.5 w-3.5 shrink-0" /> Create Collection
+          </button>
+          <button class="flex items-center gap-2 rounded-sm px-2 py-1.5 text-xs cursor-pointer hover:bg-accent hover:text-accent-foreground w-full text-left" @click="ctxCopyUri">
+            <Copy class="h-3.5 w-3.5 shrink-0" /> Copy URI
+          </button>
+          <div class="h-px bg-border my-1 mx-1" />
+          <button class="flex items-center gap-2 rounded-sm px-2 py-1.5 text-xs cursor-pointer hover:bg-destructive/10 hover:text-destructive w-full text-left text-destructive" @click="ctxDropDatabase">
+            <Trash2 class="h-3.5 w-3.5 shrink-0" /> Drop Database
+          </button>
         </template>
 
         <!-- Collection-level menu -->
         <template v-else>
-          <div class="ctx-header">{{ ctxMenu.col }}</div>
-          <button class="ctx-item" @click="ctxFindAll">⊞ Find all documents</button>
-          <button class="ctx-item" @click="ctxInsertDoc">＋ Insert document</button>
-          <div class="ctx-sep" />
-          <button class="ctx-item" @click="ctxViewStats">◎ Collection stats</button>
-          <button class="ctx-item" @click="ctxViewIndexes">⊟ View indexes</button>
-          <button class="ctx-item" @click="ctxInferSchema">∷ Infer schema</button>
-          <div class="ctx-sep" />
-          <button class="ctx-item" @click="ctxNewScript">＋ New Script</button>
-          <button class="ctx-item" :disabled="!lastScriptForCtx" @click="ctxOpenLastScript">
-            ↩ Open Last Script{{ lastScriptForCtx ? ` (${lastScriptForCtx.name})` : '' }}
+          <div class="px-2 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide border-b border-border mb-0.5 overflow-hidden text-ellipsis whitespace-nowrap">{{ ctxMenu.col }}</div>
+          <button class="flex items-center gap-2 rounded-sm px-2 py-1.5 text-xs cursor-pointer hover:bg-accent hover:text-accent-foreground w-full text-left" @click="ctxFindAll">
+            <Search class="h-3.5 w-3.5 shrink-0" /> Find all documents
           </button>
-          <div class="ctx-sep" />
-          <button class="ctx-item" @click="ctxCopyUri">⎘ Copy URI</button>
-          <div class="ctx-sep" />
-          <button class="ctx-item ctx-danger" @click="ctxDropCollection">✕ Drop Collection</button>
+          <button class="flex items-center gap-2 rounded-sm px-2 py-1.5 text-xs cursor-pointer hover:bg-accent hover:text-accent-foreground w-full text-left" @click="ctxInsertDoc">
+            <Plus class="h-3.5 w-3.5 shrink-0" /> Insert document
+          </button>
+          <div class="h-px bg-border my-1 mx-1" />
+          <button class="flex items-center gap-2 rounded-sm px-2 py-1.5 text-xs cursor-pointer hover:bg-accent hover:text-accent-foreground w-full text-left" @click="ctxViewStats">
+            <BarChart3 class="h-3.5 w-3.5 shrink-0" /> Collection stats
+          </button>
+          <button class="flex items-center gap-2 rounded-sm px-2 py-1.5 text-xs cursor-pointer hover:bg-accent hover:text-accent-foreground w-full text-left" @click="ctxViewIndexes">
+            <ListTree class="h-3.5 w-3.5 shrink-0" /> View indexes
+          </button>
+          <button class="flex items-center gap-2 rounded-sm px-2 py-1.5 text-xs cursor-pointer hover:bg-accent hover:text-accent-foreground w-full text-left" @click="ctxInferSchema">
+            <Braces class="h-3.5 w-3.5 shrink-0" /> Infer schema
+          </button>
+          <div class="h-px bg-border my-1 mx-1" />
+          <button class="flex items-center gap-2 rounded-sm px-2 py-1.5 text-xs cursor-pointer hover:bg-accent hover:text-accent-foreground w-full text-left" @click="ctxNewScript">
+            <Plus class="h-3.5 w-3.5 shrink-0" /> New Script
+          </button>
+          <button class="flex items-center gap-2 rounded-sm px-2 py-1.5 text-xs cursor-pointer hover:bg-accent hover:text-accent-foreground w-full text-left disabled:opacity-40 disabled:cursor-default disabled:hover:bg-transparent" :disabled="!lastScriptForCtx" @click="ctxOpenLastScript">
+            <FileText class="h-3.5 w-3.5 shrink-0" /> Open Last Script{{ lastScriptForCtx ? ` (${lastScriptForCtx.name})` : '' }}
+          </button>
+          <div class="h-px bg-border my-1 mx-1" />
+          <button class="flex items-center gap-2 rounded-sm px-2 py-1.5 text-xs cursor-pointer hover:bg-accent hover:text-accent-foreground w-full text-left" @click="ctxCopyUri">
+            <Copy class="h-3.5 w-3.5 shrink-0" /> Copy URI
+          </button>
+          <div class="h-px bg-border my-1 mx-1" />
+          <button class="flex items-center gap-2 rounded-sm px-2 py-1.5 text-xs cursor-pointer hover:bg-destructive/10 hover:text-destructive w-full text-left text-destructive" @click="ctxDropCollection">
+            <Trash2 class="h-3.5 w-3.5 shrink-0" /> Drop Collection
+          </button>
         </template>
 
       </div>
@@ -698,191 +723,170 @@ onBeforeUnmount(() => document.removeEventListener('click', closeCtxMenu))
   </Teleport>
 
   <!-- Confirm dialog -->
-  <Teleport to="body">
-    <div v-if="confirmDlg.show" class="modal-overlay" @click.self="cancelConfirm">
-      <div class="modal modal-sm">
-        <div class="modal-header">
-          <span class="modal-title">Confirm</span>
-          <button class="btn-icon" @click="cancelConfirm">✕</button>
-        </div>
-        <p class="confirm-msg">{{ confirmDlg.message }}</p>
-        <div class="modal-footer">
-          <button class="btn-ghost" @click="cancelConfirm">Cancel</button>
-          <button class="btn-danger" @click="doConfirm">Confirm</button>
-        </div>
+  <Dialog :open="confirmDlg.show" @update:open="(v: boolean) => { if (!v) cancelConfirm() }">
+    <DialogContent class="sm:max-w-[360px] bg-card border-border">
+      <DialogHeader>
+        <DialogTitle class="text-sm font-semibold">Confirm</DialogTitle>
+      </DialogHeader>
+      <p class="text-[13px] text-foreground leading-relaxed py-1">{{ confirmDlg.message }}</p>
+      <div class="flex justify-end gap-2 pt-4 border-t border-border">
+        <Button variant="outline" size="sm" @click="cancelConfirm">Cancel</Button>
+        <Button variant="destructive" size="sm" @click="doConfirm">Confirm</Button>
       </div>
-    </div>
-  </Teleport>
+    </DialogContent>
+  </Dialog>
 
   <!-- Import connections dialog -->
-  <Teleport to="body">
-    <div v-if="importDlg.show" class="modal-overlay" @click.self="importDlg.show = false">
-      <div class="modal" style="max-width:480px">
-        <div class="modal-header">
-          <span class="modal-title">Import Connections</span>
-          <button class="btn-icon" @click="importDlg.show = false">✕</button>
-        </div>
-        <p class="confirm-msg" style="margin-bottom:8px">Select connections to import:</p>
-        <div class="import-list">
-          <label
-            v-for="(c, i) in importDlg.candidates"
-            :key="i"
-            class="import-row"
-          >
-            <input type="checkbox" v-model="c.selected" />
-            <span class="import-name">{{ c.name }}</span>
-            <span class="import-uri">{{ c.uri || `${c.host}:${c.port}` }}</span>
-          </label>
-        </div>
-        <div class="modal-footer">
-          <button class="btn-ghost" @click="importDlg.show = false">Cancel</button>
-          <button class="btn-primary" :disabled="!importDlg.candidates.some(c => c.selected)" @click="doImport">
-            Import {{ importDlg.candidates.filter(c => c.selected).length }} connection(s)
-          </button>
-        </div>
+  <Dialog :open="importDlg.show" @update:open="(v: boolean) => { importDlg.show = v }">
+    <DialogContent class="sm:max-w-[480px] bg-card border-border">
+      <DialogHeader>
+        <DialogTitle class="text-sm font-semibold">Import Connections</DialogTitle>
+      </DialogHeader>
+      <p class="text-[13px] text-foreground mb-2">Select connections to import:</p>
+      <div class="import-list">
+        <label
+          v-for="(c, i) in importDlg.candidates"
+          :key="i"
+          class="import-row"
+        >
+          <input type="checkbox" v-model="c.selected" />
+          <span class="import-name">{{ c.name }}</span>
+          <span class="import-uri">{{ c.uri || `${c.host}:${c.port}` }}</span>
+        </label>
       </div>
-    </div>
-  </Teleport>
+      <div class="flex justify-end gap-2 pt-4 border-t border-border">
+        <Button variant="outline" size="sm" @click="importDlg.show = false">Cancel</Button>
+        <Button size="sm" :disabled="!importDlg.candidates.some(c => c.selected)" @click="doImport">
+          Import {{ importDlg.candidates.filter(c => c.selected).length }} connection(s)
+        </Button>
+      </div>
+    </DialogContent>
+  </Dialog>
 
   <!-- Collection stats dialog -->
-  <Teleport to="body">
-    <div v-if="statsDlg.show" class="modal-overlay" @click.self="statsDlg.show = false">
-      <div class="modal modal-sm">
-        <div class="modal-header">
-          <span class="modal-title">Collection Stats</span>
-          <button class="btn-icon" @click="statsDlg.show = false">✕</button>
-        </div>
-        <div v-if="statsDlg.loading" class="dlg-loading">Loading…</div>
-        <table v-else-if="statsDlg.stats" class="stats-table">
-          <thead><tr><th>Property</th><th>Value</th></tr></thead>
-          <tbody>
-            <tr><td class="stats-label">Namespace</td><td class="stats-val">{{ statsDlg.stats.ns }}</td></tr>
-            <tr><td class="stats-label">Documents</td><td class="stats-val">{{ statsDlg.stats.count.toLocaleString() }}</td></tr>
-            <tr><td class="stats-label">Storage size</td><td class="stats-val">{{ formatBytes(statsDlg.stats.storage_size) }}</td></tr>
-            <tr><td class="stats-label">Avg object size</td><td class="stats-val">{{ formatBytes(statsDlg.stats.avg_obj_size) }}</td></tr>
-            <tr><td class="stats-label">Total index size</td><td class="stats-val">{{ formatBytes(statsDlg.stats.total_index_size) }}</td></tr>
-            <tr><td class="stats-label">Indexes</td><td class="stats-val">{{ statsDlg.stats.index_count }}</td></tr>
-          </tbody>
-        </table>
-        <div class="modal-footer">
-          <button class="btn-ghost" @click="statsDlg.show = false">Close</button>
-        </div>
+  <Dialog :open="statsDlg.show" @update:open="(v: boolean) => { statsDlg.show = v }">
+    <DialogContent class="sm:max-w-[360px] bg-card border-border">
+      <DialogHeader>
+        <DialogTitle class="text-sm font-semibold">Collection Stats</DialogTitle>
+      </DialogHeader>
+      <div v-if="statsDlg.loading" class="dlg-loading">Loading...</div>
+      <table v-else-if="statsDlg.stats" class="stats-table">
+        <thead><tr><th>Property</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td class="stats-label">Namespace</td><td class="stats-val">{{ statsDlg.stats.ns }}</td></tr>
+          <tr><td class="stats-label">Documents</td><td class="stats-val">{{ statsDlg.stats.count.toLocaleString() }}</td></tr>
+          <tr><td class="stats-label">Storage size</td><td class="stats-val">{{ formatBytes(statsDlg.stats.storage_size) }}</td></tr>
+          <tr><td class="stats-label">Avg object size</td><td class="stats-val">{{ formatBytes(statsDlg.stats.avg_obj_size) }}</td></tr>
+          <tr><td class="stats-label">Total index size</td><td class="stats-val">{{ formatBytes(statsDlg.stats.total_index_size) }}</td></tr>
+          <tr><td class="stats-label">Indexes</td><td class="stats-val">{{ statsDlg.stats.index_count }}</td></tr>
+        </tbody>
+      </table>
+      <div class="flex justify-end gap-2 pt-4 border-t border-border">
+        <Button variant="outline" size="sm" @click="statsDlg.show = false">Close</Button>
       </div>
-    </div>
-  </Teleport>
+    </DialogContent>
+  </Dialog>
 
   <!-- Indexes dialog -->
-  <Teleport to="body">
-    <div v-if="indexesDlg.show" class="modal-overlay" @click.self="indexesDlg.show = false">
-      <div class="modal indexes-modal">
-        <div class="modal-header">
-          <span class="modal-title">Indexes — {{ indexesDlg.col }}</span>
-          <button class="btn-icon" @click="indexesDlg.show = false">✕</button>
-        </div>
-        <div v-if="indexesDlg.loading" class="dlg-loading">Loading…</div>
-        <div v-else-if="!indexesDlg.indexes.length" class="dlg-loading">No indexes found</div>
-        <div v-else class="scroll-body">
-          <table class="info-table">
-            <thead><tr><th>Name</th><th>Keys</th><th>Unique</th><th>Sparse</th></tr></thead>
-            <tbody>
-              <tr v-for="idx in indexesDlg.indexes" :key="idx.name">
-                <td class="idx-name">{{ idx.name }}</td>
-                <td class="idx-keys">{{ JSON.stringify(idx.keys) }}</td>
-                <td class="info-flag">{{ idx.unique ? '✓' : '' }}</td>
-                <td class="info-flag">{{ idx.sparse ? '✓' : '' }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div class="modal-footer">
-          <button class="btn-ghost" @click="indexesDlg.show = false">Close</button>
-        </div>
+  <Dialog :open="indexesDlg.show" @update:open="(v: boolean) => { indexesDlg.show = v }">
+    <DialogContent class="sm:max-w-[620px] bg-card border-border">
+      <DialogHeader>
+        <DialogTitle class="text-sm font-semibold">Indexes — {{ indexesDlg.col }}</DialogTitle>
+      </DialogHeader>
+      <div v-if="indexesDlg.loading" class="dlg-loading">Loading...</div>
+      <div v-else-if="!indexesDlg.indexes.length" class="dlg-loading">No indexes found</div>
+      <div v-else class="scroll-body">
+        <table class="info-table">
+          <thead><tr><th>Name</th><th>Keys</th><th>Unique</th><th>Sparse</th></tr></thead>
+          <tbody>
+            <tr v-for="idx in indexesDlg.indexes" :key="idx.name">
+              <td class="idx-name">{{ idx.name }}</td>
+              <td class="idx-keys">{{ JSON.stringify(idx.keys) }}</td>
+              <td class="info-flag">{{ idx.unique ? '✓' : '' }}</td>
+              <td class="info-flag">{{ idx.sparse ? '✓' : '' }}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
-    </div>
-  </Teleport>
+      <div class="flex justify-end gap-2 pt-4 border-t border-border">
+        <Button variant="outline" size="sm" @click="indexesDlg.show = false">Close</Button>
+      </div>
+    </DialogContent>
+  </Dialog>
 
   <!-- Schema inference dialog -->
-  <Teleport to="body">
-    <div v-if="schemaDlg.show" class="modal-overlay" @click.self="schemaDlg.show = false">
-      <div class="modal schema-modal">
-        <div class="modal-header">
-          <span class="modal-title">Schema — {{ schemaDlg.col }}</span>
-          <button class="btn-icon" @click="schemaDlg.show = false">✕</button>
-        </div>
-        <div v-if="schemaDlg.loading" class="dlg-loading">Sampling 100 documents…</div>
-        <div v-else-if="!schemaDlg.fields.length" class="dlg-loading">No fields found</div>
-        <div v-else class="scroll-body">
-          <table class="info-table">
-            <thead><tr><th>Field</th><th>Types</th><th>Presence</th></tr></thead>
-            <tbody>
-              <tr v-for="f in schemaDlg.fields" :key="f.path">
-                <td class="schema-field">{{ f.path }}</td>
-                <td class="schema-types">{{ f.types.join(', ') }}</td>
-                <td class="schema-pct">{{ (f.presence * 100).toFixed(0) }}%</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div class="modal-footer">
-          <button class="btn-ghost" @click="schemaDlg.show = false">Close</button>
-        </div>
+  <Dialog :open="schemaDlg.show" @update:open="(v: boolean) => { schemaDlg.show = v }">
+    <DialogContent class="sm:max-w-[580px] bg-card border-border">
+      <DialogHeader>
+        <DialogTitle class="text-sm font-semibold">Schema — {{ schemaDlg.col }}</DialogTitle>
+      </DialogHeader>
+      <div v-if="schemaDlg.loading" class="dlg-loading">Sampling 100 documents...</div>
+      <div v-else-if="!schemaDlg.fields.length" class="dlg-loading">No fields found</div>
+      <div v-else class="scroll-body">
+        <table class="info-table">
+          <thead><tr><th>Field</th><th>Types</th><th>Presence</th></tr></thead>
+          <tbody>
+            <tr v-for="f in schemaDlg.fields" :key="f.path">
+              <td class="schema-field">{{ f.path }}</td>
+              <td class="schema-types">{{ f.types.join(', ') }}</td>
+              <td class="schema-pct">{{ (f.presence * 100).toFixed(0) }}%</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
-    </div>
-  </Teleport>
+      <div class="flex justify-end gap-2 pt-4 border-t border-border">
+        <Button variant="outline" size="sm" @click="schemaDlg.show = false">Close</Button>
+      </div>
+    </DialogContent>
+  </Dialog>
 
   <!-- Insert document dialog -->
-  <Teleport to="body">
-    <div v-if="insertDlg.show" class="modal-overlay" @click.self="insertDlg.show = false">
-      <div class="modal insert-modal">
-        <div class="modal-header">
-          <span class="modal-title">Insert Document — {{ insertDlg.col }}</span>
-          <button class="btn-icon" @click="insertDlg.show = false">✕</button>
-        </div>
-        <div class="form-group">
-          <label for="insert-doc-json">Document JSON</label>
-          <textarea
-            id="insert-doc-json"
-            v-model="insertDlg.json"
-            class="insert-textarea"
-            spellcheck="false"
-            @keydown.ctrl.enter.prevent="submitInsert"
-            @keydown.meta.enter.prevent="submitInsert"
-          />
-        </div>
-        <div v-if="insertDlg.error" class="insert-error">{{ insertDlg.error }}</div>
-        <div class="modal-footer">
-          <button class="btn-ghost" @click="insertDlg.show = false">Cancel</button>
-          <button class="btn-primary" @click="submitInsert">Insert</button>
-        </div>
+  <Dialog :open="insertDlg.show" @update:open="(v: boolean) => { insertDlg.show = v }">
+    <DialogContent class="sm:max-w-[520px] bg-card border-border">
+      <DialogHeader>
+        <DialogTitle class="text-sm font-semibold">Insert Document — {{ insertDlg.col }}</DialogTitle>
+      </DialogHeader>
+      <div class="form-group">
+        <label for="insert-doc-json">Document JSON</label>
+        <textarea
+          id="insert-doc-json"
+          v-model="insertDlg.json"
+          class="insert-textarea"
+          spellcheck="false"
+          @keydown.ctrl.enter.prevent="submitInsert"
+          @keydown.meta.enter.prevent="submitInsert"
+        />
       </div>
-    </div>
-  </Teleport>
+      <div v-if="insertDlg.error" class="insert-error">{{ insertDlg.error }}</div>
+      <div class="flex justify-end gap-2 pt-4 border-t border-border">
+        <Button variant="outline" size="sm" @click="insertDlg.show = false">Cancel</Button>
+        <Button size="sm" @click="submitInsert">Insert</Button>
+      </div>
+    </DialogContent>
+  </Dialog>
 
   <!-- Create collection dialog -->
-  <Teleport to="body">
-    <div v-if="newColDlg.show" class="modal-overlay" @click.self="newColDlg.show = false">
-      <div class="modal modal-sm">
-        <div class="modal-header">
-          <span class="modal-title">New Collection</span>
-          <button class="btn-icon" @click="newColDlg.show = false">✕</button>
-        </div>
-        <p class="confirm-msg" style="color: var(--text-muted)">Database: <strong>{{ newColDlg.db }}</strong></p>
-        <div class="form-group">
-          <input
-            v-model="newColDlg.name"
-            placeholder="collection_name"
-            autofocus
-            @keyup.enter="submitNewCol"
-            @keyup.escape="newColDlg.show = false"
-          />
-        </div>
-        <div class="modal-footer">
-          <button class="btn-ghost" @click="newColDlg.show = false">Cancel</button>
-          <button class="btn-primary" :disabled="!newColDlg.name.trim()" @click="submitNewCol">Create</button>
-        </div>
+  <Dialog :open="newColDlg.show" @update:open="(v: boolean) => { newColDlg.show = v }">
+    <DialogContent class="sm:max-w-[360px] bg-card border-border">
+      <DialogHeader>
+        <DialogTitle class="text-sm font-semibold">New Collection</DialogTitle>
+      </DialogHeader>
+      <p class="text-[13px] text-muted-foreground">Database: <strong>{{ newColDlg.db }}</strong></p>
+      <div class="form-group">
+        <input
+          v-model="newColDlg.name"
+          placeholder="collection_name"
+          autofocus
+          @keyup.enter="submitNewCol"
+          @keyup.escape="newColDlg.show = false"
+        />
       </div>
-    </div>
-  </Teleport>
+      <div class="flex justify-end gap-2 pt-4 border-t border-border">
+        <Button variant="outline" size="sm" @click="newColDlg.show = false">Cancel</Button>
+        <Button size="sm" :disabled="!newColDlg.name.trim()" @click="submitNewCol">Create</Button>
+      </div>
+    </DialogContent>
+  </Dialog>
 </template>
 
 <style scoped>
@@ -894,6 +898,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closeCtxMenu))
   border-bottom: 1px solid var(--border); flex-shrink: 0;
 }
 .tree-title { user-select: none; }
+.tree-header-actions { display: flex; gap: 1px; }
 .tree-search { padding: 4px 6px; flex-shrink: 0; }
 .tree-search input { font-size: 11px; padding: 3px 6px; width: 100%; }
 .tree-body { flex: 1; overflow-y: auto; padding: 4px 0; }
@@ -922,33 +927,6 @@ onBeforeUnmount(() => document.removeEventListener('click', closeCtxMenu))
 .tree-node:hover .tree-actions { display: flex; }
 .tree-action { font-size: 11px; padding: 1px 4px; }
 
-/* Context menu */
-.ctx-backdrop { position: fixed; inset: 0; z-index: 999; }
-.ctx-menu {
-  position: fixed; z-index: 1000;
-  background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 4px; min-width: 200px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
-}
-.ctx-header {
-  padding: 4px 10px 6px; font-size: 10px; font-weight: 600;
-  color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;
-  border-bottom: 1px solid var(--border); margin-bottom: 2px;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.ctx-item {
-  display: flex; width: 100%; align-items: center;
-  padding: 6px 10px; font-size: 12px; color: var(--text);
-  background: transparent; border: none; border-radius: 3px;
-  text-align: left; cursor: pointer; white-space: nowrap;
-  overflow: hidden; text-overflow: ellipsis;
-}
-.ctx-item:hover:not(:disabled) { background: var(--bg-hover); }
-.ctx-item:disabled { opacity: 0.4; cursor: default; }
-.ctx-danger { color: var(--red, #e06c75); }
-.ctx-danger:hover:not(:disabled) { background: rgba(224, 108, 117, 0.12); }
-.ctx-sep { height: 1px; background: var(--border); margin: 3px 6px; }
-
 /* Loading indicator */
 .tree-loading-msg { font-size: 11px; color: var(--text-muted); cursor: default; gap: 6px; }
 .loading-dot {
@@ -957,15 +935,6 @@ onBeforeUnmount(() => document.removeEventListener('click', closeCtxMenu))
   animation: blink 1s ease-in-out infinite;
 }
 @keyframes blink { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
-
-/* Confirm / small modal */
-.modal-sm { max-width: 360px; }
-.confirm-msg { font-size: 13px; color: var(--text); padding: 8px 0 12px; line-height: 1.5; }
-.btn-danger {
-  background: var(--red, #e06c75); color: #fff; border: none;
-  border-radius: var(--radius); padding: 6px 14px; font-size: 12px; cursor: pointer;
-}
-.btn-danger:hover { opacity: 0.85; }
 
 /* Mode tabs */
 .mode-tabs { display: flex; gap: 0; margin-bottom: 12px; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
@@ -1004,8 +973,6 @@ onBeforeUnmount(() => document.removeEventListener('click', closeCtxMenu))
 .stats-table th { text-align: left; font-size: 10px; color: var(--text-muted); text-transform: uppercase; padding: 0 0 6px; font-weight: 600; }
 .stats-label { color: var(--text-dim); padding: 5px 12px 5px 0; white-space: nowrap; }
 .stats-val { color: var(--text); font-family: var(--font-mono); font-size: 12px; }
-.indexes-modal { min-width: 480px; max-width: 620px; }
-.schema-modal  { min-width: 440px; max-width: 580px; }
 .scroll-body { max-height: 320px; overflow-y: auto; margin-bottom: 4px; }
 .info-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .info-table thead tr { border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--bg-card); }
@@ -1017,7 +984,6 @@ onBeforeUnmount(() => document.removeEventListener('click', closeCtxMenu))
 .schema-field { color: var(--accent); font-family: var(--font-mono); font-size: 11px; white-space: nowrap; }
 .schema-types { color: var(--text); font-size: 11px; }
 .schema-pct { color: var(--text-dim); text-align: right; font-size: 11px; white-space: nowrap; padding-right: 0; }
-.insert-modal { min-width: 400px; max-width: 520px; }
 .insert-textarea {
   width: 100%; min-height: 160px; resize: vertical;
   font-family: var(--font-mono); font-size: 12px;
