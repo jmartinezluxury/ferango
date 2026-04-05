@@ -1,6 +1,6 @@
 [package]
 name = "ferango"
-version = "0.2.1"
+version = "0.3.0"
 description = "Fast, lightweight MongoDB GUI — built with Rust and Tauri"
 authors = ["Ferango contributors"]
 edition = "2021"
