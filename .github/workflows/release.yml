@@ -43,12 +43,12 @@ jobs:
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 10
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
 
       # ── Rust ─────────────────────────────────────────────────────────────────
@@ -75,6 +75,25 @@ jobs:
             libdbus-1-dev \
             libsecret-1-dev
 
+      # ── macOS: Import Apple Developer certificate ────────────────────────────
+      - name: Import Apple Developer Certificate
+        if: matrix.platform == 'macos-latest'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          echo $APPLE_CERTIFICATE | base64 --decode > certificate.p12
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security set-keychain-settings -t 3600 -u build.keychain
+          security import certificate.p12 -k build.keychain \
+            -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" build.keychain
+          security find-identity -v -p codesigning build.keychain
+
       # ── Frontend ─────────────────────────────────────────────────────────────
       - name: Install frontend dependencies
         run: pnpm install
@@ -84,37 +103,29 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # ── Signing secrets (only pass when the secret is actually set) ───────
-          # macOS: APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD,
-          #        APPLE_SIGNING_IDENTITY, APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID
-          # Windows: TAURI_SIGNING_PRIVATE_KEY, TAURI_SIGNING_PRIVATE_KEY_PASSWORD
-          # Add the secrets to the repo and uncomment below to enable signing:
-          # APPLE_CERTIFICATE:          ${{ secrets.APPLE_CERTIFICATE }}
-          # APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          # APPLE_SIGNING_IDENTITY:     ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          # APPLE_ID:                   ${{ secrets.APPLE_ID }}
-          # APPLE_PASSWORD:             ${{ secrets.APPLE_PASSWORD }}
-          # APPLE_TEAM_ID:              ${{ secrets.APPLE_TEAM_ID }}
-          # TAURI_SIGNING_PRIVATE_KEY:          ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          # TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # macOS signing + notarization
+          APPLE_CERTIFICATE:          ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY:     ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID:                   ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD:             ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID:              ${{ secrets.APPLE_TEAM_ID }}
         with:
           tauriScript: pnpm exec tauri
           tagName: ${{ github.ref_name }}
           releaseName: 'Ferango ${{ github.ref_name }}'
           releaseBody: |
-            ## What's new
+            ## What's new in ${{ github.ref_name }}
 
-            See the full [CHANGELOG](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
+            See the full commit history for details.
 
             ## Downloads
 
             | Platform | File |
             |---|---|
-            | macOS (Apple Silicon + Intel) | `.dmg` |
+            | macOS (Apple Silicon + Intel) | `.dmg` (signed + notarized) |
             | Windows | `.msi` or `.exe` |
             | Linux | `.AppImage` or `.deb` |
-
-            > **macOS note:** If you see "unidentified developer", right-click the app and choose Open, or run `xattr -cr /Applications/Ferango.app`.
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.build_args }}
