@@ -161,17 +161,17 @@ onMounted(async () => {
               v-for="(tab, i) in editorStore.tabs"
               :key="tab.script.path"
               :class="[
-                'flex items-center gap-1.5 px-3 text-xs cursor-pointer border-r border-border whitespace-nowrap transition-colors',
+                'flex items-center min-w-[100px] pl-2.5 pr-1.5 text-xs cursor-pointer border-r border-border whitespace-nowrap transition-colors',
                 i === editorStore.activeTabIndex
                   ? 'bg-background text-foreground border-b-2 border-b-primary'
                   : 'text-muted-foreground hover:bg-accent'
               ]"
               @click="editorStore.switchTab(i)"
             >
-              <span class="max-w-[120px] overflow-hidden text-ellipsis">{{ tab.script.name }}{{ tab.modified ? ' ●' : '' }}</span>
+              <span class="overflow-hidden text-ellipsis flex-1">{{ tab.script.name }}{{ tab.modified ? ' ●' : '' }}</span>
               <button
-                class="text-[10px] rounded px-0.5 opacity-0 hover:opacity-100 hover:bg-accent hover:text-destructive transition-opacity"
-                :class="{ 'opacity-100': i === editorStore.activeTabIndex }"
+                class="text-[10px] leading-none rounded ml-2 opacity-0 hover:text-destructive transition-opacity shrink-0"
+                :class="{ '!opacity-100': i === editorStore.activeTabIndex }"
                 title="Close"
                 @click.stop="editorStore.closeTab(i)"
               >✕</button>
