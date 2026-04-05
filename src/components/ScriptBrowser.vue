@@ -273,7 +273,7 @@ watch(() => connStore.activeConn?.id, () => { if (historyOpen.value) loadHistory
 .script-row.active { background: var(--bg-active); }
 .script-icon { color: var(--text-muted); flex-shrink: 0; }
 .script-name { flex: 1; font-size: 12px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); }
-.script-row.active .script-name { color: var(--accent); }
+.script-row.active .script-name { color: var(--primary); }
 .rename-input { flex: 1; font-size: 12px; padding: 1px 4px; font-family: var(--font-mono); }
 
 .script-actions { display: none; gap: 1px; }
