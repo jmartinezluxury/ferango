@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.0] — 2026-04-08
+
+### Added
+- **Tailwind CSS v4 + shadcn-vue** — full UI modernization infrastructure
+- **App layout rewrite** — toolbar, tabs, status bar, and modals migrated to Tailwind + shadcn
+- **ConnectionTree & ScriptBrowser** migrated to shadcn components + Lucide icons
+- **Roboto font + Lucide icons** — improved typography and increased text sizes
+- **Independent tab results** — each tab maintains its own query results
+- **Auto-reconnection** — reconnects to the cluster automatically when needed
+- **Tab persistence** — open tabs survive app restarts
+- **Collection autocomplete** — collection names suggested as you type
+
+### Fixed
+- **ResultViewer reactivity** — results now update correctly when switching tabs or databases
+- **Query database routing** — queries always target the correct database
+- **Script active text color** — uses `--primary` for dark mode visibility
+- **Tab close button positioning** — removed extra padding, reduced right margin
+
+### Changed
+- **Single Monaco editor with model swapping** — replaced multiple editor instances with one shared editor that swaps models per tab, with breadcrumb navigation and tree auto-scroll
+
+### CI
+- **macOS code signing and notarization** — release workflow now signs and notarizes `.dmg` bundles via Apple Developer certificate
+
+---
+
 ## [0.2.1] — 2026-03-10
 
 ### Fixed
@@ -102,6 +128,7 @@ Initial public release.
 - Font size adjustable from 10 to 24px
 - Keyboard shortcuts reference panel
 
+[0.3.0]: https://github.com/jmartinezluxury/ferango/releases/tag/v0.3.0
 [0.2.1]: https://github.com/jmartinezluxury/ferango/releases/tag/v0.2.1
 [0.2.0]: https://github.com/jmartinezluxury/ferango/releases/tag/v0.2.0
 [0.1.1]: https://github.com/jmartinezluxury/ferango/releases/tag/v0.1.1
